@@ -150,6 +150,9 @@ from dagster._core.definitions.decorators.sensor_decorator import (
     sensor as sensor,
     multi_asset_sensor as multi_asset_sensor,
 )
+from dagster._core.definitions.decorators.source_asset_decorator import (
+    source_asset as source_asset,
+)
 from dagster._core.definitions.dependency import (
     DependencyDefinition as DependencyDefinition,
     MultiDependencyDefinition as MultiDependencyDefinition,

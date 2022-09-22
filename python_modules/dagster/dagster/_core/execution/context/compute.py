@@ -609,3 +609,5 @@ class OpExecutionContext(SolidExecutionContext):
             context.log.info("Hello, world!")
 
     """
+
+SourceAssetObservationContext: TypeAliass = OpExecutionContext

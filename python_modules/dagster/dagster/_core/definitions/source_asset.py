@@ -1,5 +1,6 @@
 import warnings
-from typing import Dict, Iterator, Mapping, NamedTuple, Optional, Sequence, Union, cast
+from typing import Callable, Dict, Iterator, Mapping, NamedTuple, Optional, Sequence, Union, cast
+from typing_extensions import TypeAlias
 
 import dagster._check as check
 from dagster._annotations import PublicAttr, public
@@ -25,15 +26,18 @@ from dagster._core.definitions.utils import (
     validate_group_name,
 )
 from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvalidInvocationError
+from dagster._core.execution.context.compute import SourceAssetObservationContext
 from dagster._core.storage.io_manager import IOManagerDefinition
 from dagster._utils import merge_dicts
 from dagster._utils.backcompat import ExperimentalWarning, experimental_arg_warning
 
+SourceAssetObserveFunction: TypeAlias = Callable[[SourceAssetObservationContext], str]
 
 class SourceAsset(
     NamedTuple(
         "_SourceAsset",
         [
+            ("observe_fn", PublicAttr[Optional[SourceAssetObserveFunction]]),
             ("key", PublicAttr[AssetKey]),
             ("metadata_entries", Sequence[Union[MetadataEntry, PartitionMetadataEntry]]),
             ("io_manager_key", PublicAttr[Optional[str]]),
@@ -48,6 +52,8 @@ class SourceAsset(
     """A SourceAsset represents an asset that will be loaded by (but not updated by) Dagster.
 
     Attributes:
+        observe_fn (Optional[SourceAssetObservationContext]) Function that
+            generates a logical version for a source asset.
         key (Union[AssetKey, Sequence[str], str]): The key of the asset.
         metadata_entries (List[MetadataEntry]): Metadata associated with the asset.
         io_manager_key (Optional[str]): The key for the IOManager that will be used to load the contents of
@@ -71,6 +77,7 @@ class SourceAsset(
         _metadata_entries: Optional[Sequence[Union[MetadataEntry, PartitionMetadataEntry]]] = None,
         group_name: Optional[str] = None,
         resource_defs: Optional[Mapping[str, ResourceDefinition]] = None,
+        observe_fn: SourceAssetObserveFunction,
         # Add additional fields to with_resources and with_group below
     ):
 

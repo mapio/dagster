@@ -66,6 +66,7 @@ def asset(
     op_tags: Optional[Dict[str, Any]] = ...,
     group_name: Optional[str] = ...,
     output_required: bool = ...,
+    reconcile: bool = ...,
 ) -> Callable[[Callable[..., Any]], AssetsDefinition]:
     ...
 
@@ -90,6 +91,7 @@ def asset(
     op_tags: Optional[Dict[str, Any]] = None,
     group_name: Optional[str] = None,
     output_required: bool = True,
+    reconcile: bool = False,
 ) -> Union[AssetsDefinition, Callable[[Callable[..., Any]], AssetsDefinition]]:
     """Create a definition for how to compute an asset.
 
@@ -144,6 +146,7 @@ def asset(
         output_required (bool): Whether the decorated function will always materialize an asset.
             Defaults to True. If False, the function can return None, which will not be materialized to
             storage and will halt execution of downstream assets.
+        reconcile (bool): Treat this asset as a reconciled asset.
 
     Examples:
 
@@ -184,6 +187,7 @@ def asset(
             op_tags=op_tags,
             group_name=group_name,
             output_required=output_required,
+            reconcile=reconcile
         )(fn)
 
     return inner
@@ -208,6 +212,7 @@ class _Asset:
         op_tags: Optional[Dict[str, Any]] = None,
         group_name: Optional[str] = None,
         output_required: bool = True,
+        reconcile: bool = False,
     ):
         self.name = name
 
@@ -294,6 +299,7 @@ class _Asset:
             partition_mappings=partition_mappings if partition_mappings else None,
             resource_defs=self.resource_defs,
             group_names_by_key={out_asset_key: self.group_name} if self.group_name else None,
+            reconcile=reconcile
         )
 
 

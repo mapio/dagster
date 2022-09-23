@@ -12,6 +12,7 @@ from dagster._core.definitions.metadata import (
     PartitionMetadataEntry,
     normalize_metadata,
 )
+from dagster._core.definitions.node_definition import NodeDefinition
 from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.definitions.resource_definition import ResourceDefinition
 from dagster._core.definitions.resource_requirement import (
@@ -39,7 +40,6 @@ class SourceAsset(
     NamedTuple(
         "_SourceAsset",
         [
-            ("observe_fn", PublicAttr[Optional[SourceAssetObserveFunction]]),
             ("key", PublicAttr[AssetKey]),
             ("metadata_entries", Sequence[Union[MetadataEntry, PartitionMetadataEntry]]),
             ("io_manager_key", PublicAttr[Optional[str]]),
@@ -47,6 +47,7 @@ class SourceAsset(
             ("partitions_def", PublicAttr[Optional[PartitionsDefinition]]),
             ("group_name", PublicAttr[str]),
             ("resource_defs", PublicAttr[Dict[str, ResourceDefinition]]),
+            ("node_def", PublicAttr[Optional[NodeDefinition]])
         ],
     ),
     ResourceAddable,
@@ -54,8 +55,6 @@ class SourceAsset(
     """A SourceAsset represents an asset that will be loaded by (but not updated by) Dagster.
 
     Attributes:
-        observe_fn (Optional[SourceAssetObservationContext]) Function that
-            generates a logical version for a source asset.
         key (Union[AssetKey, Sequence[str], str]): The key of the asset.
         metadata_entries (List[MetadataEntry]): Metadata associated with the asset.
         io_manager_key (Optional[str]): The key for the IOManager that will be used to load the contents of
@@ -66,6 +65,8 @@ class SourceAsset(
         description (Optional[str]): The description of the asset.
         partitions_def (Optional[PartitionsDefinition]): Defines the set of partition keys that
             compose the asset.
+        node_def (Optional[SourceAssetObservationContext]) Op that generates a logical version for a
+            source asset.
     """
 
     def __new__(
@@ -79,7 +80,7 @@ class SourceAsset(
         _metadata_entries: Optional[Sequence[Union[MetadataEntry, PartitionMetadataEntry]]] = None,
         group_name: Optional[str] = None,
         resource_defs: Optional[Mapping[str, ResourceDefinition]] = None,
-        observe_fn: Optional[SourceAssetObserveFunction] = None,
+        node_def: Optional[NodeDefinition] = None,
         # Add additional fields to with_resources and with_group below
     ):
 
@@ -117,7 +118,7 @@ class SourceAsset(
             ),
             group_name=validate_group_name(group_name),
             resource_defs=resource_defs,
-            observe_fn=observe_fn,
+            node_def=node_def,
         )
 
     @public  # type: ignore

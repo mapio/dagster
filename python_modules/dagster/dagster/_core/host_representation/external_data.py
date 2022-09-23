@@ -986,6 +986,7 @@ def external_asset_graph_from_defs(
                     metadata_entries=metadata_entries,
                     group_name=source_asset.group_name,
                     is_source=True,
+                    reconcile=source_asset.node_def is not None,
                 )
             )
 

@@ -1,6 +1,7 @@
 from typing import Mapping, Optional, Sequence, Union, overload
 
-from dagster._core.definitions.events import AssetKey, CoercibleToAssetKeyPrefix
+import dagster._check as check
+from dagster._core.definitions.events import AssetKey, AssetObservation, CoercibleToAssetKeyPrefix
 from dagster._core.definitions.metadata import (
     MetadataEntry,
     MetadataUserInput,
@@ -9,12 +10,16 @@ from dagster._core.definitions.metadata import (
 from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.definitions.resource_definition import ResourceDefinition
 from dagster._core.definitions.source_asset import SourceAsset, SourceAssetObserveFunction
+from dagster._core.execution.context.compute import OpExecutionContext
 from dagster._core.storage.io_manager import IOManagerDefinition
+
+from ..decorators.op_decorator import _Op
 
 
 @overload
 def source_asset(observe_fn: SourceAssetObserveFunction) -> SourceAsset:
     ...
+
 
 @overload
 def source_asset(
@@ -31,6 +36,7 @@ def source_asset(
     resource_defs: Optional[Mapping[str, ResourceDefinition]] = None,
 ) -> "_SourceAsset":
     ...
+
 
 def source_asset(
     observe_fn: Optional[SourceAssetObserveFunction] = None,
@@ -94,8 +100,28 @@ class _SourceAsset:
         self.resource_defs = resource_defs
 
     def __call__(self, observe_fn: SourceAssetObserveFunction) -> SourceAsset:
-        source_asset_name = self.name or observe_fn.__name__
-        source_asset_key = AssetKey([*self.key_prefix, source_asset_name])
+        if observe_fn is not None:
+            source_asset_name = self.name or observe_fn.__name__
+            source_asset_key = AssetKey([*self.key_prefix, source_asset_name])
+
+            def fn(context: OpExecutionContext) -> None:
+                logical_version = observe_fn(context)
+                check.inst(version, str, "Observe function did not return a valid version!")
+                context.log_event(AssetObservation(
+                    asset_key=source_asset_key, metadata={"logical_version": logical_version}
+                ))
+
+            op = _Op(
+                name="__".join(source_asset_key.path).replace("-", "_"),
+                description=self.description,
+                # required_resource_keys=required_resource_keys,
+                # tags={
+                #     **({"kind": self.compute_kind} if self.compute_kind else {}),
+                #     **(self.op_tags or {}),
+                # },
+                # config_schema=self.config_schema,
+            )(fn)
+
         return SourceAsset(
             source_asset_key,
             self.metadata,
@@ -106,5 +132,5 @@ class _SourceAsset:
             self._metadata_entries,
             self.group_name,
             self.resource_defs,
-            observe_fn,
+            op,
         )

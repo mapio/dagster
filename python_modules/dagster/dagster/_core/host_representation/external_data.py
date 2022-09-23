@@ -917,6 +917,7 @@ def external_asset_graph_from_defs(
     ] = defaultdict(list)
     asset_info_by_asset_key: Dict[AssetKey, AssetOutputInfo] = dict()
     metadata_by_asset_key: Dict[AssetKey, MetadataUserInput] = dict()
+    reconcile_by_asset_key: Dict[AssetKey, bool] = dict()
 
     deps: Dict[AssetKey, Dict[AssetKey, ExternalAssetDependency]] = defaultdict(dict)
     dep_by: Dict[AssetKey, Dict[AssetKey, ExternalAssetDependedBy]] = defaultdict(dict)
@@ -942,6 +943,7 @@ def external_asset_graph_from_defs(
             all_upstream_asset_keys.update(upstream_asset_keys)
             node_defs_by_asset_key[output_key].append((node_output_handle, pipeline_def))
             asset_info_by_asset_key[output_key] = asset_info
+            reconcile_by_asset_key[output_key] = pipeline_def.asset_layer.assets_def_for_asset(output_key).reconcile
 
             for upstream_key in upstream_asset_keys:
                 deps[output_key][upstream_key] = ExternalAssetDependency(
@@ -1063,6 +1065,7 @@ def external_asset_graph_from_defs(
                 # name specified we default to DEFAULT_GROUP_NAME here to ensure
                 # such assets are part of the default group
                 group_name=group_names.get(asset_key, DEFAULT_GROUP_NAME),
+                reconcile=reconcile_by_asset_key[asset_key],
             )
         )
 

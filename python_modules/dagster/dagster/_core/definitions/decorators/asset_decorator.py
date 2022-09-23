@@ -235,6 +235,7 @@ class _Asset:
         self.resource_defs = dict(check.opt_mapping_param(resource_defs, "resource_defs"))
         self.group_name = group_name
         self.output_required = output_required
+        self.reconcile = reconcile
 
     def __call__(self, fn: Callable) -> AssetsDefinition:
         asset_name = self.name or fn.__name__
@@ -299,7 +300,7 @@ class _Asset:
             partition_mappings=partition_mappings if partition_mappings else None,
             resource_defs=self.resource_defs,
             group_names_by_key={out_asset_key: self.group_name} if self.group_name else None,
-            reconcile=reconcile
+            reconcile=self.reconcile
         )
 
 

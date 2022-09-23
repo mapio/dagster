@@ -3099,6 +3099,7 @@ export interface AssetNodeDefinitionFragment {
   repository: AssetNodeDefinitionFragment_repository;
   computeKind: string | null;
   assetKey: AssetNodeDefinitionFragment_assetKey;
+  reconcile: boolean | null;
   metadataEntries: AssetNodeDefinitionFragment_metadataEntries[];
   type: AssetNodeDefinitionFragment_type | null;
 }

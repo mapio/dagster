@@ -414,6 +414,7 @@ type AssetNode {
   opNames: [String!]!
   partitionKeys: [String!]!
   partitionDefinition: String
+  reconcile: Boolean
   repository: Repository!
   requiredResources: [ResourceRequirement!]!
   type: DagsterType

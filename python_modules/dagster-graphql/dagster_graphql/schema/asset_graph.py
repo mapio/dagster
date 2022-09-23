@@ -140,6 +140,7 @@ class GrapheneAssetNode(graphene.ObjectType):
     opNames = non_null_list(graphene.String)
     partitionKeys = non_null_list(graphene.String)
     partitionDefinition = graphene.String()
+    reconcile = graphene.Boolean()
     repository = graphene.NonNull(lambda: external.GrapheneRepository)
     required_resources = non_null_list(GrapheneResourceRequirement)
     type = graphene.Field(GrapheneDagsterType)
@@ -263,9 +264,8 @@ class GrapheneAssetNode(graphene.ObjectType):
     def is_graph_backed_asset(self) -> bool:
         return self.graphName is not None
 
-    # all regular assets belong to at least one job
     def is_source_asset(self) -> bool:
-        return len(self._external_asset_node.job_names) == 0
+        return self._external_asset_node.is_source
 
     def resolve_assetMaterializations(
         self, graphene_info, **kwargs
@@ -502,6 +502,9 @@ class GrapheneAssetNode(graphene.ObjectType):
 
     def resolve_partitionKeys(self, _graphene_info) -> Sequence[str]:
         return self.get_partition_keys()
+
+    def resolve_reconcile(self, _graphene_info) -> bool:
+        return self._external_asset_node.reconcile
 
     def resolve_repository(self, graphene_info) -> "GrapheneRepository":
         return external.GrapheneRepository(

@@ -801,6 +801,8 @@ class ExternalAssetNode(
             ("output_description", Optional[str]),
             ("metadata_entries", Sequence[MetadataEntry]),
             ("group_name", Optional[str]),
+            ("is_source", bool),
+            ("reconcile", bool),
         ],
     )
 ):
@@ -826,10 +828,13 @@ class ExternalAssetNode(
         output_description: Optional[str] = None,
         metadata_entries: Optional[Sequence[MetadataEntry]] = None,
         group_name: Optional[str] = None,
+        is_source: bool = False,
+        reconcile: bool = False,
     ):
         # backcompat logic to handle ExternalAssetNodes serialized without op_names/graph_name
         if not op_names:
             op_names = list(filter(None, [op_name]))
+
         return super(ExternalAssetNode, cls).__new__(
             cls,
             asset_key=check.inst_param(asset_key, "asset_key", AssetKey),
@@ -857,6 +862,8 @@ class ExternalAssetNode(
                 metadata_entries, "metadata_entries", of_type=MetadataEntry
             ),
             group_name=check.opt_str_param(group_name, "group_name"),
+            is_source=check.bool_param(is_source, "is_source"),
+            reconcile=check.bool_param(reconcile, "reconcile"),
         )
 
 
@@ -978,6 +985,7 @@ def external_asset_graph_from_defs(
                     op_description=source_asset.description,
                     metadata_entries=metadata_entries,
                     group_name=source_asset.group_name,
+                    is_source=True,
                 )
             )
 

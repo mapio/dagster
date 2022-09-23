@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, Dict, Iterator, Mapping, NamedTuple, Optional, Sequence, Union, cast
+from typing import TYPE_CHECKING, Callable, Dict, Iterator, Mapping, NamedTuple, Optional, Sequence, Union, cast
 from typing_extensions import TypeAlias
 
 import dagster._check as check
@@ -26,12 +26,14 @@ from dagster._core.definitions.utils import (
     validate_group_name,
 )
 from dagster._core.errors import DagsterInvalidDefinitionError, DagsterInvalidInvocationError
-from dagster._core.execution.context.compute import SourceAssetObservationContext
 from dagster._core.storage.io_manager import IOManagerDefinition
 from dagster._utils import merge_dicts
 from dagster._utils.backcompat import ExperimentalWarning, experimental_arg_warning
 
-SourceAssetObserveFunction: TypeAlias = Callable[[SourceAssetObservationContext], str]
+if TYPE_CHECKING:
+    from dagster._core.execution.context.compute import SourceAssetObserveContext
+
+SourceAssetObserveFunction: TypeAlias = Callable[["SourceAssetObserveContext"], str]
 
 class SourceAsset(
     NamedTuple(
@@ -77,7 +79,7 @@ class SourceAsset(
         _metadata_entries: Optional[Sequence[Union[MetadataEntry, PartitionMetadataEntry]]] = None,
         group_name: Optional[str] = None,
         resource_defs: Optional[Mapping[str, ResourceDefinition]] = None,
-        observe_fn: SourceAssetObserveFunction,
+        observe_fn: Optional[SourceAssetObserveFunction] = None,
         # Add additional fields to with_resources and with_group below
     ):
 
@@ -115,6 +117,7 @@ class SourceAsset(
             ),
             group_name=validate_group_name(group_name),
             resource_defs=resource_defs,
+            observe_fn=observe_fn,
         )
 
     @public  # type: ignore

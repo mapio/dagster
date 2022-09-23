@@ -610,4 +610,4 @@ class OpExecutionContext(SolidExecutionContext):
 
     """
 
-SourceAssetObservationContext: TypeAliass = OpExecutionContext
+SourceAssetObserveContext: TypeAlias = OpExecutionContext

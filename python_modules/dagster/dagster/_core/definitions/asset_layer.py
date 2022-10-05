@@ -668,7 +668,12 @@ class AssetLayer:
 
     @property
     def asset_keys(self) -> Iterable[AssetKey]:
-        return self._dependency_node_handles_by_asset_key.keys()
+        # return [*self._dependency_node_handles_by_asset_key.keys(), *self._source_assets_by_key.keys()]
+        from itertools import chain
+
+        return chain(
+            self._dependency_node_handles_by_asset_key.keys(), self._source_assets_by_key.keys()
+        )
 
     @property
     def source_assets_by_key(self) -> Mapping[AssetKey, "SourceAsset"]:
@@ -693,6 +698,15 @@ class AssetLayer:
 
     def io_manager_key_for_asset(self, asset_key: AssetKey) -> str:
         return self._io_manager_keys_by_asset_key.get(asset_key, "io_manager")
+
+    def is_source_for_asset(self, asset_key: AssetKey) -> bool:
+        return self._assets_defs_by_key[asset_key].is_source
+
+    def is_versioned_for_asset(self, asset_key: AssetKey) -> bool:
+        return self._assets_defs_by_key[asset_key].is_versioned
+
+    def op_version_for_asset(self, asset_key: AssetKey) -> Optional[str]:
+        return self._assets_defs_by_key[asset_key].op.version
 
     def metadata_for_asset(self, asset_key: AssetKey) -> Optional[MetadataUserInput]:
         if asset_key in self._source_assets_by_key:
@@ -792,13 +806,19 @@ def build_asset_selection_job(
     asset_selection_data: Optional[AssetSelectionData] = None,
 ) -> "JobDefinition":
     from dagster._core.definitions import build_assets_job
+    from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
 
+    print("CHECKING ASSET SELECTION")
     if asset_selection:
+        print("YES! ASSET SELECTION")
         included_assets, excluded_assets = _subset_assets_defs(
             assets, source_assets, asset_selection
         )
+        print("INCLUDED ASSETS", included_assets)
+        print("EXCLUDED ASSETS", excluded_assets)
     else:
-        included_assets = cast(Iterable["AssetsDefinition"], assets)
+        # included_assets = cast(Iterable["AssetsDefinition"], assets)
+        included_assets = [*assets, *[sa for sa in source_assets if sa.node_def]]
         excluded_assets = list(source_assets)
 
     if partitions_def:
@@ -814,9 +834,9 @@ def build_asset_selection_job(
         warnings.simplefilter("ignore", category=ExperimentalWarning)
         asset_job = build_assets_job(
             name=name,
-            assets=included_assets,
+            assets=[asset for asset in included_assets if isinstance(asset, AssetsDefinition)],
             config=config,
-            source_assets=excluded_assets,
+            source_assets=list(source_assets),
             resource_defs=resource_defs,
             executor_def=executor_def,
             partitions_def=partitions_def,
@@ -832,21 +852,21 @@ def _subset_assets_defs(
     assets: Iterable["AssetsDefinition"],
     source_assets: Iterable["SourceAsset"],
     selected_asset_keys: AbstractSet[AssetKey],
-) -> Tuple[Iterable["AssetsDefinition"], Sequence[Union["AssetsDefinition", "SourceAsset"]]]:
+) -> Tuple[
+    Iterable[Union["AssetsDefinition", "SourceAsset"]],
+    Sequence[Union["AssetsDefinition", "SourceAsset"]],
+]:
     """Given a list of asset key selection queries, generate a set of AssetsDefinition objects
     representing the included/excluded definitions.
     """
     from dagster._core.definitions import AssetsDefinition
 
-    included_assets: Set[AssetsDefinition] = set()
-    excluded_assets: Set[AssetsDefinition] = set()
-
-    included_keys: Set[AssetKey] = set()
+    included_assets: Set[Union[AssetsDefinition, SourceAsset]] = set()
+    excluded_assets: Set[Union[AssetsDefinition, SourceAsset]] = set()
 
     for asset in set(assets):
         # intersection
         selected_subset = selected_asset_keys & asset.keys
-        included_keys.update(selected_subset)
         # all assets in this def are selected
         if selected_subset == asset.keys:
             included_assets.add(asset)
@@ -868,9 +888,12 @@ def _subset_assets_defs(
                 "asset keys produced by this asset."
             )
 
-    all_excluded_assets: Sequence[Union["AssetsDefinition", "SourceAsset"]] = [
-        *excluded_assets,
-        *source_assets,
-    ]
+    print("SOURCE ASSETS", source_assets)
+    for source_asset in set(source_assets):
+        print("SORRCE ASSET KEY TYPE", type(source_asset.key))
+        if source_asset.key in selected_asset_keys:
+            included_assets.add(source_asset)
+        else:
+            excluded_assets.add(source_asset)
 
-    return list(included_assets), all_excluded_assets
+    return list(included_assets), list(excluded_assets)

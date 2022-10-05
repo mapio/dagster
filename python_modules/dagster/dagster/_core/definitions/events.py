@@ -355,7 +355,7 @@ class AssetObservation(
         description: Optional[str] = None,
         metadata_entries: Optional[List[MetadataEntry]] = None,
         partition: Optional[str] = None,
-        metadata: Optional[Dict[str, RawMetadataValue]] = None,
+        metadata: Optional[Mapping[str, RawMetadataValue]] = None,
     ):
         if isinstance(asset_key, AssetKey):
             check.inst_param(asset_key, "asset_key", AssetKey)

@@ -4,9 +4,16 @@ from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 from typing_extensions import TypeAlias, TypedDict
 
+from dagster_graphql.implementation.fetch_assets import asset_node_iter
+
 from dagster import DagsterInstance
 from dagster import _check as check
 from dagster._core.definitions.events import AssetKey
+from dagster._core.definitions.logical_version import (
+    LogicalVersion,
+    get_logical_version_from_inputs,
+    get_most_recent_logical_version,
+)
 from dagster._core.events.log import EventLogEntry
 from dagster._core.host_representation import ExternalRepository
 from dagster._core.host_representation.external_data import (
@@ -444,3 +451,63 @@ class CrossRepoAssetDependedByLoader:
         return external_asset_deps.get((repository_location_name, repository_name), {}).get(
             asset_key, []
         )
+
+
+class ProjectedLogicalVersionLoader:
+    """
+    A batch loader that computes the projected logical version for a set of asset keys. This is
+    necessary to avoid recomputation, since each asset's logical version is a function of its
+    dependency logical versions.
+    """
+
+    def __init__(
+        self,
+        graphene_info,
+        key_to_node_map: Mapping[AssetKey, ExternalAssetNode],
+    ):
+        self._graphene_info = graphene_info
+        self._key_to_node_map = key_to_node_map
+        self._key_to_version_map: Dict[AssetKey, LogicalVersion] = {}
+
+    def get(self, asset_key: AssetKey) -> str:
+        if not self._has_version(asset_key):
+            self._compute_version(asset_key)
+        return self._fetch_version(asset_key).value
+
+    def _has_version(self, key: AssetKey) -> bool:
+        return key in self._key_to_version_map
+
+    def _fetch_version(self, key: AssetKey) -> LogicalVersion:
+        return self._key_to_version_map[key]
+
+    def _compute_version(self, key: AssetKey) -> None:
+        node = self._fetch_node(key)
+        if node.is_source:
+            version = get_most_recent_logical_version(
+                key, True, self._graphene_info.context.instance
+            )
+        else:
+            dep_keys = {dep.upstream_asset_key for dep in node.dependencies}
+            for dep_key in dep_keys:
+                if not self._has_version(dep_key):
+                    self._compute_version(dep_key)
+            version = get_logical_version_from_inputs(
+                dep_keys,
+                check.not_none(node.op_version),
+                {key: node.is_source for key in dep_keys},
+                self._graphene_info.context.instance,
+                self._key_to_version_map,
+            )
+        self._key_to_version_map[key] = version
+
+    def _fetch_node(self, key: AssetKey) -> ExternalAssetNode:
+        if key in self._key_to_node_map:
+            return self._key_to_node_map[key]
+        else:
+            self._fetch_all_nodes()
+            return self._fetch_node(key)
+
+    def _fetch_all_nodes(self):
+        self._key_to_node_map = {
+            node.asset_key: node for _, _, node in asset_node_iter(self._graphene_info)
+        }

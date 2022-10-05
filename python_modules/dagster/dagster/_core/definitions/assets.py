@@ -76,7 +76,6 @@ class AssetsDefinition(ResourceAddable):
     _selected_asset_keys: AbstractSet[AssetKey]
     _can_subset: bool
     _metadata_by_key: Mapping[AssetKey, MetadataUserInput]
-    _reconcile: bool
 
     def __init__(
         self,
@@ -92,7 +91,6 @@ class AssetsDefinition(ResourceAddable):
         resource_defs: Optional[Mapping[str, ResourceDefinition]] = None,
         group_names_by_key: Optional[Mapping[AssetKey, str]] = None,
         metadata_by_key: Optional[Mapping[AssetKey, MetadataUserInput]] = None,
-        reconcile: bool = False,
         # if adding new fields, make sure to handle them in the with_prefix_or_group
         # and from_graph methods
     ):
@@ -157,8 +155,6 @@ class AssetsDefinition(ResourceAddable):
                 node_def.resolve_output_to_origin(output_name, None)[0].metadata,
                 self._metadata_by_key.get(asset_key, {}),
             )
-
-        self._reconcile = reconcile
 
     def __call__(self, *args, **kwargs):
         from dagster._core.definitions.decorators.solid_decorator import DecoratedSolidFunction
@@ -517,8 +513,8 @@ class AssetsDefinition(ResourceAddable):
 
     @public  # type: ignore
     @property
-    def reconcile(self) -> bool:
-        return self._reconcile
+    def is_versioned(self) -> bool:
+        return self.op.version is not None
 
     @property
     def metadata_by_key(self):

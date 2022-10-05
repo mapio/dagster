@@ -66,7 +66,7 @@ def asset(
     op_tags: Optional[Dict[str, Any]] = ...,
     group_name: Optional[str] = ...,
     output_required: bool = ...,
-    reconcile: bool = ...,
+    version: Union[bool, str] = ...,
 ) -> Callable[[Callable[..., Any]], AssetsDefinition]:
     ...
 
@@ -91,7 +91,7 @@ def asset(
     op_tags: Optional[Dict[str, Any]] = None,
     group_name: Optional[str] = None,
     output_required: bool = True,
-    reconcile: bool = False,
+    version: Union[bool, str] = False,
 ) -> Union[AssetsDefinition, Callable[[Callable[..., Any]], AssetsDefinition]]:
     """Create a definition for how to compute an asset.
 
@@ -146,7 +146,11 @@ def asset(
         output_required (bool): Whether the decorated function will always materialize an asset.
             Defaults to True. If False, the function can return None, which will not be materialized to
             storage and will halt execution of downstream assets.
-        reconcile (bool): Treat this asset as a reconciled asset.
+        version (Union[bool, str]): (Experimental) If `false` is passed, the asset is unversioned.
+            If `true` is passed, the asset is opted into version-based reconciliation, with the
+            version of the underlying op set to a default value. If a string is passed, the asset is
+            opted into version-based reconciliation and the passed value is set as the version on
+            the underlying op.
 
     Examples:
 
@@ -187,7 +191,7 @@ def asset(
             op_tags=op_tags,
             group_name=group_name,
             output_required=output_required,
-            reconcile=reconcile
+            version=version,
         )(fn)
 
     return inner
@@ -212,7 +216,7 @@ class _Asset:
         op_tags: Optional[Dict[str, Any]] = None,
         group_name: Optional[str] = None,
         output_required: bool = True,
-        reconcile: bool = False,
+        version: Union[bool, str] = False,
     ):
         self.name = name
 
@@ -235,7 +239,7 @@ class _Asset:
         self.resource_defs = dict(check.opt_mapping_param(resource_defs, "resource_defs"))
         self.group_name = group_name
         self.output_required = output_required
-        self.reconcile = reconcile
+        self.version = version
 
     def __call__(self, fn: Callable) -> AssetsDefinition:
         asset_name = self.name or fn.__name__
@@ -300,7 +304,6 @@ class _Asset:
             partition_mappings=partition_mappings if partition_mappings else None,
             resource_defs=self.resource_defs,
             group_names_by_key={out_asset_key: self.group_name} if self.group_name else None,
-            reconcile=self.reconcile
         )
 
 

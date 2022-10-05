@@ -469,18 +469,24 @@ class JobDefinition(PipelineDefinition):
             "Asset layer must have _asset_defs argument defined",
         )
 
-        new_job = build_asset_selection_job(
-            name=self.name,
-            assets=set(self.asset_layer.assets_defs_by_key.values()),
-            source_assets=self.asset_layer.source_assets_by_key.values(),
-            executor_def=self.executor_def,
-            resource_defs=self.resource_defs,
-            description=self.description,
-            tags=self.tags,
-            asset_selection=asset_selection,
-            asset_selection_data=asset_selection_data,
-            config=self.config_mapping,
-        )
+        try:
+            new_job = build_asset_selection_job(
+                name=self.name,
+                assets=set(self.asset_layer.assets_defs_by_key.values()),
+                source_assets=set(self.asset_layer.source_assets_by_key.values()),
+                executor_def=self.executor_def,
+                resource_defs=self.resource_defs,
+                description=self.description,
+                tags=self.tags,
+                asset_selection=asset_selection,
+                asset_selection_data=asset_selection_data,
+                config=self.config_mapping,
+            )
+        except Exception as e:
+            import traceback
+
+            print(traceback.format_exc())
+            raise e
         return new_job
 
     def _get_job_def_for_op_selection(

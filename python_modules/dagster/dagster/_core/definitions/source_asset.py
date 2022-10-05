@@ -1,10 +1,10 @@
 import warnings
-from typing import TYPE_CHECKING, Callable, Dict, Iterator, Mapping, NamedTuple, Optional, Sequence, Union, cast
-from typing_extensions import TypeAlias
+from typing import Dict, Iterator, Mapping, NamedTuple, Optional, Sequence, Union, cast
 
 import dagster._check as check
 from dagster._annotations import PublicAttr, public
 from dagster._core.definitions.events import AssetKey, CoercibleToAssetKey
+from dagster._core.definitions.logical_version import LogicalVersion
 from dagster._core.definitions.metadata import (
     MetadataEntry,
     MetadataMapping,
@@ -13,6 +13,7 @@ from dagster._core.definitions.metadata import (
     normalize_metadata,
 )
 from dagster._core.definitions.node_definition import NodeDefinition
+from dagster._core.definitions.op_definition import OpDefinition
 from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.definitions.resource_definition import ResourceDefinition
 from dagster._core.definitions.resource_requirement import (
@@ -31,10 +32,6 @@ from dagster._core.storage.io_manager import IOManagerDefinition
 from dagster._utils import merge_dicts
 from dagster._utils.backcompat import ExperimentalWarning, experimental_arg_warning
 
-if TYPE_CHECKING:
-    from dagster._core.execution.context.compute import SourceAssetObserveContext
-
-SourceAssetObserveFunction: TypeAlias = Callable[["SourceAssetObserveContext"], str]
 
 class SourceAsset(
     NamedTuple(
@@ -47,7 +44,7 @@ class SourceAsset(
             ("partitions_def", PublicAttr[Optional[PartitionsDefinition]]),
             ("group_name", PublicAttr[str]),
             ("resource_defs", PublicAttr[Dict[str, ResourceDefinition]]),
-            ("node_def", PublicAttr[Optional[NodeDefinition]])
+            ("node_def", PublicAttr[Optional[NodeDefinition]]),
         ],
     ),
     ResourceAddable,
@@ -65,7 +62,7 @@ class SourceAsset(
         description (Optional[str]): The description of the asset.
         partitions_def (Optional[PartitionsDefinition]): Defines the set of partition keys that
             compose the asset.
-        node_def (Optional[SourceAssetObservationContext]) Op that generates a logical version for a
+        node_def (Optional[SourceAssetObservationContext]) Op that generates observation metadata for a
             source asset.
     """
 
@@ -138,6 +135,19 @@ class SourceAsset(
             self.resource_defs.get(io_manager_key) if io_manager_key else None,
         )
 
+    @public  # type: ignore
+    @property
+    def op(self) -> OpDefinition:
+        check.invariant(
+            isinstance(self.node_def, OpDefinition),
+            "The NodeDefinition for this AssetsDefinition is not of type OpDefinition.",
+        )
+        return cast(OpDefinition, self.node_def)
+
+    @property
+    def is_versioned(self) -> bool:
+        return self.node_def is not None
+
     def with_resources(self, resource_defs) -> "SourceAsset":
         from dagster._core.execution.resources_init import get_transitive_required_resource_keys
 
@@ -184,6 +194,7 @@ class SourceAsset(
                 _metadata_entries=self.metadata_entries,
                 resource_defs=relevant_resource_defs,
                 group_name=self.group_name,
+                node_def=self.node_def,
             )
 
     def with_group_name(self, group_name: str) -> "SourceAsset":
@@ -204,6 +215,7 @@ class SourceAsset(
                 partitions_def=self.partitions_def,
                 group_name=group_name,
                 resource_defs=self.resource_defs,
+                node_def=self.node_def,
             )
 
     def get_resource_requirements(self) -> Iterator[ResourceRequirement]:
@@ -212,3 +224,6 @@ class SourceAsset(
         )
         for source_key, resource_def in self.resource_defs.items():
             yield from resource_def.get_resource_requirements(outer_context=source_key)
+
+    def __hash__(self):
+        return hash(self.key)

@@ -1,7 +1,9 @@
-from typing import Mapping, Optional, Sequence, Union, overload
+from typing import TYPE_CHECKING, Callable, Mapping, Optional, Sequence, Union, overload
 
-import dagster._check as check
+from typing_extensions import TypeAlias
+
 from dagster._core.definitions.events import AssetKey, AssetObservation, CoercibleToAssetKeyPrefix
+from dagster._core.definitions.logical_version import LogicalVersion
 from dagster._core.definitions.metadata import (
     MetadataEntry,
     MetadataUserInput,
@@ -9,11 +11,20 @@ from dagster._core.definitions.metadata import (
 )
 from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.definitions.resource_definition import ResourceDefinition
-from dagster._core.definitions.source_asset import SourceAsset, SourceAssetObserveFunction
+from dagster._core.definitions.source_asset import SourceAsset
+from dagster._core.errors import DagsterInvalidObservationError
 from dagster._core.execution.context.compute import OpExecutionContext
 from dagster._core.storage.io_manager import IOManagerDefinition
 
 from ..decorators.op_decorator import _Op
+
+if TYPE_CHECKING:
+    from dagster._core.execution.context.compute import SourceAssetObserveContext
+
+SourceAssetObserveFunction: TypeAlias = Union[
+    Callable[["SourceAssetObserveContext"], Union[MetadataUserInput, LogicalVersion]],
+    Callable[[], Union[MetadataUserInput, LogicalVersion]],
+]
 
 
 @overload
@@ -105,32 +116,40 @@ class _SourceAsset:
             source_asset_key = AssetKey([*self.key_prefix, source_asset_name])
 
             def fn(context: OpExecutionContext) -> None:
-                logical_version = observe_fn(context)
-                check.inst(version, str, "Observe function did not return a valid version!")
-                context.log_event(AssetObservation(
-                    asset_key=source_asset_key, metadata={"logical_version": logical_version}
-                ))
+                raw_observation = observe_fn(context)
+                metadata = _raw_observation_to_metadata(raw_observation)
+                context.log_event(
+                    AssetObservation(
+                        asset_key=source_asset_key,
+                        metadata=metadata,
+                    )
+                )
 
             op = _Op(
                 name="__".join(source_asset_key.path).replace("-", "_"),
                 description=self.description,
-                # required_resource_keys=required_resource_keys,
-                # tags={
-                #     **({"kind": self.compute_kind} if self.compute_kind else {}),
-                #     **(self.op_tags or {}),
-                # },
-                # config_schema=self.config_schema,
             )(fn)
 
         return SourceAsset(
-            source_asset_key,
-            self.metadata,
-            self.io_manager_key,
-            self.io_manager_def,
-            self.description,
-            self.partitions_def,
-            self._metadata_entries,
-            self.group_name,
-            self.resource_defs,
-            op,
+            key=source_asset_key,
+            metadata=self.metadata,
+            io_manager_key=self.io_manager_key,
+            io_manager_def=self.io_manager_def,
+            description=self.description,
+            partitions_def=self.partitions_def,
+            _metadata_entries=self._metadata_entries,
+            group_name=self.group_name,
+            resource_defs=self.resource_defs,
+            node_def=op,
+        )
+
+
+def _raw_observation_to_metadata(raw_observation: object) -> MetadataUserInput:
+    if isinstance(raw_observation, dict):
+        return raw_observation
+    elif isinstance(raw_observation, LogicalVersion):
+        return {"logical_version": raw_observation}
+    else:
+        raise DagsterInvalidObservationError(
+            "Source asset observe function must return either a metadata dictionary or a `LogicalVersion` instance."
         )

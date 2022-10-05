@@ -32,6 +32,8 @@ export interface AssetGraphLiveQuery_assetNodes {
   repository: AssetGraphLiveQuery_assetNodes_repository;
   assetKey: AssetGraphLiveQuery_assetNodes_assetKey;
   assetMaterializations: AssetGraphLiveQuery_assetNodes_assetMaterializations[];
+  currentLogicalVersion: string | null;
+  projectedLogicalVersion: string | null;
 }
 
 export interface AssetGraphLiveQuery_assetsLatestInfo_assetKey {

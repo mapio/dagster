@@ -14,6 +14,7 @@ import {
   useQueryRefreshAtInterval,
 } from '../app/QueryRefresh';
 import {LaunchAssetExecutionButton} from '../assets/LaunchAssetExecutionButton';
+import {LaunchAssetObservationButton} from '../assets/LaunchAssetObservationButton';
 import {AssetKey} from '../assets/types';
 import {SVGViewport} from '../graph/SVGViewport';
 import {useAssetLayout} from '../graph/asyncGraphLayout';
@@ -40,14 +41,13 @@ import {AssetEdges} from './AssetEdges';
 import {AssetGraphJobSidebar} from './AssetGraphJobSidebar';
 import {AssetGroupNode} from './AssetGroupNode';
 import {AssetNode, AssetNodeMinimal} from './AssetNode';
-import {ForeignNode} from './ForeignNode';
+import {SourceAssetNode} from './ForeignNode';
 import {SidebarAssetInfo} from './SidebarAssetInfo';
 import {
   GraphData,
   graphHasCycles,
   LiveData,
   GraphNode,
-  isSourceAsset,
   tokenForAssetKey,
 } from './Utils';
 import {AssetGraphLayout} from './layout';
@@ -67,7 +67,7 @@ interface Props {
 
   explorerPath: ExplorerPath;
   onChangeExplorerPath: (path: ExplorerPath, mode: 'replace' | 'push') => void;
-  onNavigateToForeignNode: (node: AssetLocation) => void;
+  onNavigateToSourceAssetNode: (node: AssetLocation) => void;
 }
 
 export const MINIMAL_SCALE = 0.5;
@@ -138,7 +138,7 @@ export const AssetGraphExplorerWithData: React.FC<
     setOptions,
     explorerPath,
     onChangeExplorerPath,
-    onNavigateToForeignNode,
+    onNavigateToSourceAssetNode: onNavigateToSourceAssetNode,
     liveDataRefreshState,
     liveDataByNode,
     assetGraphData,
@@ -156,6 +156,7 @@ export const AssetGraphExplorerWithData: React.FC<
   const selectedGraphNodes = Object.values(assetGraphData.nodes).filter((node) =>
     selectedAssetValues.includes(tokenForAssetKey(node.definition.assetKey)),
   );
+  console.log('ASSET SELECTION', selectedAssetValues);
   const lastSelectedNode = selectedGraphNodes[selectedGraphNodes.length - 1];
 
   const {layout, loading, async} = useAssetLayout(assetGraphData);
@@ -176,7 +177,7 @@ export const AssetGraphExplorerWithData: React.FC<
       if (!nodeIsInDisplayedGraph) {
         // The asset's definition was not provided in our query for job.assetNodes. It's either
         // in another job or asset group, or is a source asset not defined in any repository.
-        return onNavigateToForeignNode(await findAssetLocation(assetKey));
+        return onNavigateToSourceAssetNode(await findAssetLocation(assetKey));
       }
 
       // This asset is in a job and we can stay in the job graph explorer!
@@ -223,7 +224,7 @@ export const AssetGraphExplorerWithData: React.FC<
     [
       explorerPath,
       onChangeExplorerPath,
-      onNavigateToForeignNode,
+      onNavigateToSourceAssetNode,
       findAssetLocation,
       lastSelectedNode,
       assetGraphData,
@@ -361,8 +362,11 @@ export const AssetGraphExplorerWithData: React.FC<
                         style={{overflow: 'visible'}}
                       >
                         {!graphNode || !graphNode.definition.opNames.length ? (
-                          <ForeignNode assetKey={{path}} />
-                        ) : scale < MINIMAL_SCALE ? (
+                          <SourceAssetNode
+                            assetKey={{path}}
+                            selected={selectedAssetValues.includes(path)}
+                          />
+                        ) : _scale < MINIMAL_SCALE ? (
                           <AssetNodeMinimal
                             definition={graphNode.definition}
                             selected={selectedGraphNodes.includes(graphNode)}
@@ -416,12 +420,19 @@ export const AssetGraphExplorerWithData: React.FC<
                 refreshState={liveDataRefreshState}
                 dataDescription="materializations"
               />
-
+              <LaunchAssetObservationButton
+                context={selectedGraphNodes.length ? 'selected' : 'all'}
+                assetKeys={(selectedGraphNodes.length
+                  ? selectedGraphNodes
+                  : Object.values(assetGraphData.nodes).filter((a) => a.definition.isSource)
+                ).map((n) => n.assetKey)}
+                preferredJobName={explorerPath.pipelineName}
+              />
               <LaunchAssetExecutionButton
                 context={selectedGraphNodes.length ? 'selected' : 'all'}
                 assetKeys={(selectedGraphNodes.length
                   ? selectedGraphNodes
-                  : Object.values(assetGraphData.nodes).filter((a) => !isSourceAsset(a.definition))
+                  : Object.values(assetGraphData.nodes).filter((a) => !a.definition.isSource)
                 ).map((n) => n.assetKey)}
                 preferredJobName={explorerPath.pipelineName}
               />

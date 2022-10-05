@@ -30,4 +30,6 @@ export interface AssetNodeLiveFragment {
   repository: AssetNodeLiveFragment_repository;
   assetKey: AssetNodeLiveFragment_assetKey;
   assetMaterializations: AssetNodeLiveFragment_assetMaterializations[];
+  currentLogicalVersion: string | null;
+  projectedLogicalVersion: string | null;
 }

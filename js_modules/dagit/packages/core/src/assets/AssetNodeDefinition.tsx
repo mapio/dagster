@@ -6,7 +6,6 @@ import {Link} from 'react-router-dom';
 import {ASSET_NODE_FRAGMENT} from '../asset-graph/AssetNode';
 import {
   displayNameForAssetKey,
-  isSourceAsset,
   LiveData,
   isHiddenAssetGroupJob,
   __ASSET_JOB_PREFIX,
@@ -202,7 +201,7 @@ const DefinitionLocation: React.FC<{
         </Mono>
       ))}
     <OpNamesDisplay assetNode={assetNode} repoAddress={repoAddress} />
-    {isSourceAsset(assetNode) && (
+    {assetNode.isSource && (
       <Caption style={{lineHeight: '16px', marginTop: 2}}>Source Asset</Caption>
     )}
   </Box>

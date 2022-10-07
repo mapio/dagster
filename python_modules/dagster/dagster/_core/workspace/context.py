@@ -5,7 +5,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from contextlib import ExitStack
-from typing import TYPE_CHECKING, Dict, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Sequence, Union, cast
 
 import dagster._check as check
 from dagster._core.errors import (
@@ -196,9 +196,9 @@ class BaseWorkspaceRequestContext(IWorkspace):
     def get_external_execution_plan(
         self,
         external_pipeline: ExternalPipeline,
-        run_config: dict,
+        run_config: Mapping[str, object],
         mode: str,
-        step_keys_to_execute: List[str],
+        step_keys_to_execute: Sequence[str],
         known_state: KnownExecutionState,
     ) -> ExternalExecutionPlan:
         return self.get_repository_location(

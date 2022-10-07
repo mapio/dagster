@@ -3,7 +3,7 @@ import sys
 import threading
 from abc import abstractmethod
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import dagster._check as check
 from dagster._api.get_server_id import sync_get_server_id
@@ -120,7 +120,7 @@ class RepositoryLocation(AbstractContextManager):
         external_pipeline: ExternalPipeline,
         run_config: Mapping[str, object],
         mode: str,
-        step_keys_to_execute: Optional[List[str]],
+        step_keys_to_execute: Optional[Sequence[str]],
         known_state: Optional[KnownExecutionState],
         instance: Optional[DagsterInstance] = None,
     ) -> ExternalExecutionPlan:

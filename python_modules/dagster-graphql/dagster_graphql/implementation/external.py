@@ -1,12 +1,15 @@
-import sys
-from typing import Mapping, Optional, Sequence, Union
+from __future__ import annotations
 
-from dagster_graphql.schema.errors import GrapheneRepositoryNotFoundError
-from dagster_graphql.schema.external import (
-    GrapheneRepository,
-    GrapheneRepositoryConnection,
-    GrapheneWorkspace,
-)
+import sys
+from typing import TYPE_CHECKING, Mapping, Optional, Sequence, Union
+
+if TYPE_CHECKING:
+    from dagster_graphql.schema.errors import GrapheneRepositoryNotFoundError
+    from dagster_graphql.schema.external import (
+        GrapheneRepository,
+        GrapheneRepositoryConnection,
+        GrapheneWorkspace,
+    )
 from dagster_graphql.schema.util import HasContext
 from graphene import ResolveInfo
 

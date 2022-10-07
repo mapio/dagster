@@ -2,7 +2,21 @@ import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
 from types import TracebackType
-from typing import Any, Callable, Dict, Iterator, List, Mapping, NamedTuple, Optional, Sequence, Tuple, Type, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    cast,
+)
 
 from graphene import ResolveInfo
 from typing_extensions import ParamSpec, TypeAlias
@@ -18,7 +32,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 GrapheneResolverFn: TypeAlias = Callable[P, T]
-T_Callable = TypeVar('T_Callable', bound=Callable)
+T_Callable = TypeVar("T_Callable", bound=Callable)
 
 
 def check_permission(permission: str) -> Callable[[GrapheneResolverFn], GrapheneResolverFn]:
@@ -49,7 +63,9 @@ def _noop(_) -> None:
 
 class ErrorCapture:
     @staticmethod
-    def default_on_exception(exc_info: Tuple[Type[BaseException], BaseException, TracebackType]) -> GraphenePythonError:
+    def default_on_exception(
+        exc_info: Tuple[Type[BaseException], BaseException, TracebackType]
+    ) -> GraphenePythonError:
         from dagster_graphql.schema.errors import GraphenePythonError
 
         # Transform exception in to PythonErron to present to user
@@ -97,13 +113,17 @@ class UserFacingGraphQLError(Exception):
 
 
 def pipeline_selector_from_graphql(data: Mapping[str, Any]) -> PipelineSelector:
-    asset_selection = cast(List[Dict[str, List[str]]], check.list_elem(data, "assetSelection", of_type=dict))
+    asset_selection = cast(
+        List[Dict[str, List[str]]], check.list_elem(data, "assetSelection", of_type=dict)
+    )
     return PipelineSelector(
         location_name=data["repositoryLocationName"],
         repository_name=data["repositoryName"],
         pipeline_name=check.not_none(data.get("pipelineName") or data.get("jobName")),
         solid_selection=data.get("solidSelection"),
-        asset_selection=[check.not_none(AssetKey.from_graphql_input(asset_key)) for asset_key in asset_selection]
+        asset_selection=[
+            check.not_none(AssetKey.from_graphql_input(asset_key)) for asset_key in asset_selection
+        ]
         if asset_selection
         else None,
     )

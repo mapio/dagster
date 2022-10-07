@@ -18,9 +18,7 @@ from dagster_graphql.schema.solids import (
 from dagster import AssetKey
 from dagster import _check as check
 from dagster._core.definitions.logical_version import (
-    get_logical_version_from_inputs,
     get_most_recent_logical_version,
-    get_most_recent_logical_versionsion,
 )
 from dagster._core.events import AssetObservationData, StepMaterializationData
 from dagster._core.events.log import EventLogEntry

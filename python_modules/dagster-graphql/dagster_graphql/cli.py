@@ -27,7 +27,11 @@ def create_dagster_graphql_cli():
     return ui
 
 
-def execute_query(workspace_process_context: WorkspaceProcessContext, query: str, variables: Optional[Mapping[str, object]]=None):
+def execute_query(
+    workspace_process_context: WorkspaceProcessContext,
+    query: str,
+    variables: Optional[Mapping[str, object]] = None,
+):
     check.inst_param(
         workspace_process_context, "workspace_process_context", WorkspaceProcessContext
     )

@@ -15,7 +15,7 @@ from ...implementation.execution import (
     terminate_pipeline_execution,
     wipe_assets,
 )
-from ...implementation.external import fetch_workspace, get_external_pipeline_or_raise,
+from ...implementation.external import fetch_workspace, get_external_pipeline_or_raise
 from ...implementation.telemetry import log_dagit_telemetry_event
 from ...implementation.utils import (
     ExecutionMetadata,
@@ -84,7 +84,9 @@ def create_execution_params(graphene_info, graphql_execution_params):
                 )
             )
 
-        external_pipeline = get_external_pipeline_or_raise(graphene_info, selector, ignore_subset=True)
+        external_pipeline = get_external_pipeline_or_raise(
+            graphene_info, selector, ignore_subset=True
+        )
 
         if not external_pipeline.has_preset(preset_name):
             raise UserFacingGraphQLError(

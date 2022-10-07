@@ -2,9 +2,6 @@ from collections import defaultdict
 from enum import Enum
 from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
-from typing_extensions import TypeAlias, TypedDict
-
-from dagster_graphql.implementation.fetch_assets import asset_node_iter
 
 from dagster import DagsterInstance
 from dagster import _check as check
@@ -35,7 +32,6 @@ class RepositoryDataType(Enum):
     SENSOR_STATES = "sensor_states"
     SCHEDULE_TICKS = "schedule_ticks"
     SENSOR_TICKS = "sensor_ticks"
-
 
 
 class RepositoryScopedBatchLoader:
@@ -201,15 +197,15 @@ class RepositoryScopedBatchLoader:
                 ]
                 ticks_by_selector = self._instance.get_batch_ticks(selector_ids, limit=limit)
                 for schedule in self._repository.get_external_schedules():
-                    fetched[schedule.get_external_origin_id()] = list(ticks_by_selector.get(
-                        schedule.selector_id, []
-                    ))
+                    fetched[schedule.get_external_origin_id()] = list(
+                        ticks_by_selector.get(schedule.selector_id, [])
+                    )
             else:
                 for schedule in self._repository.get_external_schedules():
                     origin_id = schedule.get_external_origin_id()
-                    fetched[origin_id] = list(self._instance.get_ticks(
-                        origin_id, schedule.selector_id, limit=limit
-                    ))
+                    fetched[origin_id] = list(
+                        self._instance.get_ticks(origin_id, schedule.selector_id, limit=limit)
+                    )
 
         elif data_type == RepositoryDataType.SENSOR_TICKS:
             if self._instance.supports_batch_tick_queries:
@@ -218,15 +214,15 @@ class RepositoryScopedBatchLoader:
                 ]
                 ticks_by_selector = self._instance.get_batch_ticks(selector_ids, limit=limit)
                 for sensor in self._repository.get_external_sensors():
-                    fetched[sensor.get_external_origin_id()] = list(ticks_by_selector.get(
-                        sensor.selector_id, []
-                    ))
+                    fetched[sensor.get_external_origin_id()] = list(
+                        ticks_by_selector.get(sensor.selector_id, [])
+                    )
             else:
                 for sensor in self._repository.get_external_sensors():
                     origin_id = sensor.get_external_origin_id()
-                    fetched[origin_id] = list(self._instance.get_ticks(
-                        origin_id, sensor.selector_id, limit=limit
-                    ))
+                    fetched[origin_id] = list(
+                        self._instance.get_ticks(origin_id, sensor.selector_id, limit=limit)
+                    )
 
         else:
             check.failed(f"Unknown data type for {self.__class__.__name__}: {data_type}")
@@ -508,6 +504,8 @@ class ProjectedLogicalVersionLoader:
             return self._fetch_node(key)
 
     def _fetch_all_nodes(self):
+        from dagster_graphql.implementation.fetch_assets import asset_node_iter
+
         self._key_to_node_map = {
             node.asset_key: node for _, _, node in asset_node_iter(self._graphene_info)
         }

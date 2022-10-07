@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from dagster._core.events.log import EventLogEntry
     from dagster._core.instance import DagsterInstance
 
+
 class LogicalVersion:
     """Class that represents a logical version for an asset.
 
@@ -57,6 +58,7 @@ def get_most_recent_logical_version(
 ) -> LogicalVersion:
     from dagster._core.event_api import EventRecordsFilter
     from dagster._core.events import DagsterEventType
+
     if is_source:
         observations = instance.get_event_records(
             EventRecordsFilter(
@@ -75,6 +77,7 @@ def get_most_recent_logical_version(
 
 def _extract_logical_version_from_event(event: EventLogEntry) -> LogicalVersion:
     from dagster._core.events import AssetObservationData, StepMaterializationData
+
     data = check.not_none(event.dagster_event).event_specific_data
     if isinstance(data, StepMaterializationData):
         event_data = data.materialization

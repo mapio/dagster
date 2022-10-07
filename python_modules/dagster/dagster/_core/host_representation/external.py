@@ -2,7 +2,18 @@ from __future__ import annotations
 from datetime import datetime
 
 from threading import RLock
-from typing import TYPE_CHECKING, AbstractSet, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Union
+from typing import (
+    TYPE_CHECKING,
+    AbstractSet,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
 
 import dagster._check as check
 from dagster._core.definitions.events import AssetKey
@@ -14,7 +25,12 @@ from dagster._core.definitions.sensor_definition import (
     DefaultSensorStatus,
 )
 from dagster._core.execution.plan.handle import ResolvedFromDynamicStepHandle, StepHandle
-from dagster._core.host_representation.origin import ExternalInstigatorOrigin, ExternalPartitionSetOrigin, ExternalPipelineOrigin, ExternalRepositoryOrigin
+from dagster._core.host_representation.origin import (
+    ExternalInstigatorOrigin,
+    ExternalPartitionSetOrigin,
+    ExternalPipelineOrigin,
+    ExternalRepositoryOrigin,
+)
 from dagster._core.origin import PipelinePythonOrigin, RepositoryPythonOrigin
 from dagster._core.snap import ExecutionPlanSnapshot
 from dagster._core.snap.execution_plan_snapshot import ExecutionStepSnap
@@ -415,7 +431,9 @@ class ExternalExecutionPlan:
             execution_plan_snapshot, "execution_plan_snapshot", ExecutionPlanSnapshot
         )
 
-        self._step_index: Mapping[str, ExecutionStepSnap] = {step.key: step for step in self.execution_plan_snapshot.steps}
+        self._step_index: Mapping[str, ExecutionStepSnap] = {
+            step.key: step for step in self.execution_plan_snapshot.steps
+        }
 
         self._step_keys_in_plan: AbstractSet[str] = (
             set(execution_plan_snapshot.step_keys_to_execute)
@@ -563,7 +581,9 @@ class ExternalSchedule:
             else DefaultScheduleStatus.STOPPED
         )
 
-    def get_current_instigator_state(self, stored_state: Optional["InstigatorState"]) -> InstigatorState:
+    def get_current_instigator_state(
+        self, stored_state: Optional["InstigatorState"]
+    ) -> InstigatorState:
         from dagster._core.scheduler.instigation import (
             InstigatorState,
             InstigatorStatus,
@@ -677,7 +697,9 @@ class ExternalSensor:
             )
         )
 
-    def get_current_instigator_state(self, stored_state: Optional["InstigatorState"]) -> InstigatorState:
+    def get_current_instigator_state(
+        self, stored_state: Optional["InstigatorState"]
+    ) -> InstigatorState:
         from dagster._core.scheduler.instigation import (
             InstigatorState,
             InstigatorStatus,
@@ -723,7 +745,9 @@ class ExternalSensor:
 
 
 class ExternalPartitionSet:
-    def __init__(self, external_partition_set_data: ExternalPartitionSetData, handle: RepositoryHandle):
+    def __init__(
+        self, external_partition_set_data: ExternalPartitionSetData, handle: RepositoryHandle
+    ):
         self._external_partition_set_data = check.inst_param(
             external_partition_set_data, "external_partition_set_data", ExternalPartitionSetData
         )

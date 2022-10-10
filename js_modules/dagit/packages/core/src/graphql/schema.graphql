@@ -1610,6 +1610,7 @@ type InstigationTick {
   cursor: String
   runs: [Run!]!
   originRunIds: [String!]!
+  logKey: [String!]
 }
 
 enum InstigationTickStatus {

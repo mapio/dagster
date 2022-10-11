@@ -545,6 +545,11 @@ type Run implements PipelineRun {
   Compute logs are the stdout/stderr logs for a given solid step computation
   """
   computeLogs(stepKey: String!): ComputeLogs!
+
+  """
+  Captured logs are the stdout/stderr logs for a given file key within the run
+  """
+  capturedLogs(fileKey: String!): CapturedLogs!
   executionPlan: ExecutionPlan
   stepKeysToExecute: [String!]
   runConfigYaml: String!
@@ -581,6 +586,11 @@ interface PipelineRun {
   Compute logs are the stdout/stderr logs for a given solid step computation
   """
   computeLogs(stepKey: String!): ComputeLogs!
+
+  """
+  Captured logs are the stdout/stderr logs for a given file key within the run
+  """
+  capturedLogs(fileKey: String!): CapturedLogs!
   executionPlan: ExecutionPlan
   stepKeysToExecute: [String!]
   runConfigYaml: String!
@@ -765,6 +775,13 @@ type ComputeLogFile {
   cursor: Int!
   size: Int!
   downloadUrl: String
+}
+
+type CapturedLogs {
+  logKey: [String!]!
+  stdout: String
+  stderr: String
+  cursor: String
 }
 
 type ExecutionPlan {
@@ -2794,13 +2811,6 @@ type PipelineRunLogsSubscriptionFailure {
 enum ComputeIOType {
   STDOUT
   STDERR
-}
-
-type CapturedLogs {
-  logKey: [String!]!
-  stdout: String
-  stderr: String
-  cursor: String
 }
 
 type LocationStateChangeSubscription {

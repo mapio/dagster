@@ -537,6 +537,7 @@ class GrapheneDagitQuery(graphene.ObjectType):
             AssetKey.from_graphql_input(asset_key) for asset_key in kwargs.get("assetKeys", [])
         )
 
+        repo = None
         if "group" in kwargs:
             group_name = kwargs.get("group").get("groupName")
             repo_sel = RepositorySelector.from_graphql_input(kwargs.get("group"))
@@ -581,9 +582,19 @@ class GrapheneDagitQuery(graphene.ObjectType):
 
         depended_by_loader = CrossRepoAssetDependedByLoader(context=graphene_info.context)
 
+        if repo is not None:
+            repos = [repo]
+        else:
+            repos = []
+            used = set()
+            for node in results:
+                if not node.external_repository.name in used:
+                    repos.append(node.external_repository)
+
         projected_logical_version_loader = ProjectedLogicalVersionLoader(
-            graphene_info=graphene_info,
-            key_to_node_map={node.asset_key: node.external_asset_node for node in results},
+            instance=graphene_info.context.instance,
+            key_to_node_map={node.assetKey: node.external_asset_node for node in results},
+            repositories=repos,
         )
 
         return [

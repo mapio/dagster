@@ -456,14 +456,22 @@ class ProjectedLogicalVersionLoader:
     dependency logical versions.
     """
 
+    # @static
+    # def from_node(node: ExternalAssetNode, instance: DagsterInstance):
+    #     return ProjectedLogicalVersionLoader(
+    #         instance, [node.repository], {node.key: node}
+    #     )
+
     def __init__(
         self,
-        graphene_info,
-        key_to_node_map: Mapping[AssetKey, ExternalAssetNode],
+        instance: DagsterInstance,
+        repositories: Sequence[ExternalRepository],
+        key_to_node_map: Optional[Mapping[AssetKey, ExternalAssetNode]],
     ):
-        self._graphene_info = graphene_info
-        self._key_to_node_map = key_to_node_map
+        self._instance = instance
+        self._key_to_node_map = check.opt_dict_param(key_to_node_map, "key_to_node_map")
         self._key_to_version_map: Dict[AssetKey, LogicalVersion] = {}
+        self._repositories = repositories
 
     def get(self, asset_key: AssetKey) -> str:
         if not self._has_version(asset_key):
@@ -479,9 +487,7 @@ class ProjectedLogicalVersionLoader:
     def _compute_version(self, key: AssetKey) -> None:
         node = self._fetch_node(key)
         if node.is_source:
-            version = get_most_recent_logical_version(
-                key, True, self._graphene_info.context.instance
-            )
+            version = get_most_recent_logical_version(key, True, self._instance)
         else:
             dep_keys = {dep.upstream_asset_key for dep in node.dependencies}
             for dep_key in dep_keys:
@@ -491,7 +497,7 @@ class ProjectedLogicalVersionLoader:
                 dep_keys,
                 check.not_none(node.op_version),
                 {key: node.is_source for key in dep_keys},
-                self._graphene_info.context.instance,
+                self._instance,
                 self._key_to_version_map,
             )
         self._key_to_version_map[key] = version
@@ -504,8 +510,7 @@ class ProjectedLogicalVersionLoader:
             return self._fetch_node(key)
 
     def _fetch_all_nodes(self):
-        from dagster_graphql.implementation.fetch_assets import asset_node_iter
-
-        self._key_to_node_map = {
-            node.asset_key: node for _, _, node in asset_node_iter(self._graphene_info)
-        }
+        self._key_to_node_map = {}
+        for repository in self._repositories:
+            for node in repository.get_external_asset_nodes():
+                self._key_to_node_map[node.asset_key] = node

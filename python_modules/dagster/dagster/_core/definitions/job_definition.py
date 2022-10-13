@@ -469,6 +469,7 @@ class JobDefinition(PipelineDefinition):
             "Asset layer must have _asset_defs argument defined",
         )
 
+        print("GET JOB DEF FOR ASSET SELECTION")
         try:
             new_job = build_asset_selection_job(
                 name=self.name,

@@ -27,7 +27,7 @@ class LogicalVersion:
         return self.value == other.value
 
 
-DEFAULT_LOGICAL_VERSION: Final[LogicalVersion] = LogicalVersion("DEFAULT")
+DEFAULT_LOGICAL_VERSION: Final[LogicalVersion] = LogicalVersion("INITIAL")
 
 
 def get_logical_version_from_inputs(
@@ -47,7 +47,7 @@ def get_logical_version_from_inputs(
         else get_most_recent_logical_version(k, key_to_is_source_map[k], instance)
         for k in ordered_dependency_keys
     ]
-    all_inputs = [op_version, *dependency_logical_versions]
+    all_inputs = [op_version, *(v.value for v in dependency_logical_versions)]
     hash_sig = sha256()
     hash_sig.update(bytearray("".join(all_inputs), "utf8"))
     return LogicalVersion(hash_sig.hexdigest())
@@ -70,7 +70,7 @@ def get_most_recent_logical_version(
         event_record = next(iter(observations), None)
         event = event_record.event_log_entry if event_record else None
     else:
-        event = instance.get_latest_materialization_events([key])[key]
+        event = instance.get_latest_materialization_events([key]).get(key)
 
     return DEFAULT_LOGICAL_VERSION if event is None else _extract_logical_version_from_event(event)
 

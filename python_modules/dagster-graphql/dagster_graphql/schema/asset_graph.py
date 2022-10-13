@@ -17,11 +17,7 @@ from dagster_graphql.schema.solids import (
 
 from dagster import AssetKey
 from dagster import _check as check
-from dagster._core.definitions.logical_version import (
-    get_most_recent_logical_version,
-)
-from dagster._core.events import AssetObservationData, StepMaterializationData
-from dagster._core.events.log import EventLogEntry
+from dagster._core.definitions.logical_version import get_most_recent_logical_version
 from dagster._core.host_representation import ExternalRepository, RepositoryLocation
 from dagster._core.host_representation.external import ExternalPipeline
 from dagster._core.host_representation.external_data import (
@@ -150,6 +146,7 @@ class GrapheneAssetNode(graphene.ObjectType):
     groupName = graphene.String()
     id = graphene.NonNull(graphene.ID)
     is_source = graphene.NonNull(graphene.Boolean)
+    is_versioned = graphene.NonNull(graphene.Boolean)
     jobNames = non_null_list(graphene.String)
     jobs = non_null_list(GraphenePipeline)
     latestMaterializationByPartition = graphene.Field(
@@ -161,13 +158,13 @@ class GrapheneAssetNode(graphene.ObjectType):
     op = graphene.Field(GrapheneSolidDefinition)
     opName = graphene.String()
     opNames = non_null_list(graphene.String)
+    opVersion = graphene.String()
     partitionKeys = non_null_list(graphene.String)
     partitionDefinition = graphene.String()
     projectedLogicalVersion = graphene.String()
     repository = graphene.NonNull(lambda: external.GrapheneRepository)
     required_resources = non_null_list(GrapheneResourceRequirement)
     type = graphene.Field(GrapheneDagsterType)
-    versioned = graphene.Boolean()
 
     class Meta:
         name = "AssetNode"
@@ -203,7 +200,7 @@ class GrapheneAssetNode(graphene.ObjectType):
         self._projected_logical_version_loader = check.opt_inst_param(
             projected_logical_version_loader,
             "projected_logical_version_loader",
-            CrossRepoAssetDependedByLoader,
+            ProjectedLogicalVersionLoader,
         )
         self._external_pipeline = None  # lazily loaded
         self._node_definition_snap = None  # lazily loaded
@@ -215,6 +212,7 @@ class GrapheneAssetNode(graphene.ObjectType):
             assetKey=external_asset_node.asset_key,
             description=external_asset_node.op_description,
             opName=external_asset_node.op_name,
+            opVersion=external_asset_node.op_version,
             groupName=external_asset_node.group_name,
         )
 
@@ -334,6 +332,28 @@ class GrapheneAssetNode(graphene.ObjectType):
                 graphene_info,
                 self._external_asset_node.asset_key,
                 partitions,
+                before_timestamp=before_timestamp,
+                limit=limit,
+            )
+        ]
+
+    def resolve_assetObservations(
+        self, graphene_info, **kwargs
+    ) -> Sequence[GrapheneObservationEvent]:
+        beforeTimestampMillis: Optional[str] = kwargs.get("beforeTimestampMillis")
+        try:
+            before_timestamp = (
+                int(beforeTimestampMillis) / 1000.0 if beforeTimestampMillis else None
+            )
+        except ValueError:
+            before_timestamp = None
+        limit = kwargs.get("limit")
+        return [
+            GrapheneObservationEvent(event=event)
+            for event in get_asset_observations(
+                graphene_info,
+                self._external_asset_node.asset_key,
+                # partitions,
                 before_timestamp=before_timestamp,
                 limit=limit,
             )
@@ -471,6 +491,9 @@ class GrapheneAssetNode(graphene.ObjectType):
     def resolve_is_source(self, _graphene_info) -> bool:
         return self.is_source_asset()
 
+    def resolve_is_versioned(self, _graphene_info) -> bool:
+        return self._external_asset_node.is_versioned
+
     def resolve_latestMaterializationByPartition(
         self, graphene_info, **kwargs
     ) -> Sequence[Optional[GrapheneMaterializationEvent]]:
@@ -554,9 +577,6 @@ class GrapheneAssetNode(graphene.ObjectType):
 
     def resolve_partitionKeys(self, _graphene_info) -> Sequence[str]:
         return self.get_partition_keys()
-
-    def resolve_versioned(self, _graphene_info) -> bool:
-        return self._external_asset_node.versioned
 
     def resolve_repository(self, graphene_info) -> "GrapheneRepository":
         return external.GrapheneRepository(

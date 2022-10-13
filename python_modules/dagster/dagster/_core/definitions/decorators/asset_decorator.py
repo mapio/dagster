@@ -13,6 +13,8 @@ from typing import (
     overload,
 )
 
+from typing_extensions import Final
+
 import dagster._check as check
 from dagster._builtins import Nothing
 from dagster._config import UserConfigSchema
@@ -37,6 +39,8 @@ from ..output import Out
 from ..partition import PartitionsDefinition
 from ..resource_definition import ResourceDefinition
 from ..utils import DEFAULT_IO_MANAGER_KEY, NoValueSentinel
+
+DEFAULT_OP_VERSION: Final[str] = "DEFAULT"
 
 
 @overload
@@ -274,6 +278,13 @@ class _Asset:
                 is_required=self.output_required,
             )
 
+            if self.version is True:
+                version = DEFAULT_OP_VERSION
+            elif self.version is False:
+                version = None
+            else:
+                version = self.version
+
             op = _Op(
                 name="__".join(out_asset_key.path).replace("-", "_"),
                 description=self.description,
@@ -285,6 +296,7 @@ class _Asset:
                     **(self.op_tags or {}),
                 },
                 config_schema=self.config_schema,
+                version=version,
             )(fn)
 
         keys_by_input_name = {

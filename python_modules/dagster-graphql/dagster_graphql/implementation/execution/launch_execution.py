@@ -18,6 +18,7 @@ def launch_pipeline_reexecution(graphene_info, execution_params: ExecutionParams
 
 @capture_error
 def launch_pipeline_execution(graphene_info, execution_params: ExecutionParams):
+    print("LAUNCH PIPELINE EXECUTION", execution_params)
     return _launch_pipeline_execution(graphene_info, execution_params)
 
 
@@ -26,6 +27,7 @@ def do_launch(graphene_info, execution_params: ExecutionParams, is_reexecuted: b
     check.inst_param(execution_params, "execution_params", ExecutionParams)
     check.bool_param(is_reexecuted, "is_reexecuted")
 
+    print("LAUNCHING WITH EXECUTION PARAMS", execution_params)
     if is_reexecuted:
         # required fields for re-execution
         execution_metadata = check.inst_param(

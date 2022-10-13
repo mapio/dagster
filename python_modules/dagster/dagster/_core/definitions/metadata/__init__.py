@@ -654,9 +654,11 @@ class LogicalVersionMetadataValue(
         logical_version (LogicalVersion): A logical version.
     """
 
-    def __new__(cls, value: LogicalVersion):
-        check.inst_param(value, "logical_version", LogicalVersion)
-        return super(LogicalVersionMetadataValue, cls).__new__(cls, value.value)
+    # TODO: we accept str here to work arounda bug with the multiprocess executor
+    def __new__(cls, value: Union[str, LogicalVersion]):
+        check.inst_param(value, "logical_version", (LogicalVersion, str))
+        str_value = value.value if isinstance(value, LogicalVersion) else value
+        return super(LogicalVersionMetadataValue, cls).__new__(cls, str_value)
 
 
 @whitelist_for_serdes(storage_name="MarkdownMetadataEntryData")

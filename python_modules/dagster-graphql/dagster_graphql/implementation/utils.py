@@ -18,6 +18,7 @@ from typing import (
     cast,
 )
 
+from dagster_graphql.schema.errors import GraphenePythonError
 from graphene import ResolveInfo
 from typing_extensions import ParamSpec, TypeAlias
 
@@ -26,7 +27,6 @@ from dagster._core.definitions.events import AssetKey
 from dagster._core.host_representation import GraphSelector, PipelineSelector
 from dagster._core.workspace.context import BaseWorkspaceRequestContext
 from dagster._utils.error import serializable_error_info_from_exc_info
-from dagster_graphql.schema.errors import GraphenePythonError
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -113,16 +113,20 @@ class UserFacingGraphQLError(Exception):
 
 
 def pipeline_selector_from_graphql(data: Mapping[str, Any]) -> PipelineSelector:
-    asset_selection = cast(
-        List[Dict[str, List[str]]], check.list_elem(data, "assetSelection", of_type=dict)
+    asset_selection = (
+        cast(List[Dict[str, List[str]]], check.list_elem(data, "assetSelection", of_type=dict))
+        if "assetSelection" in data
+        else None
     )
+    print("PIPELINE SELECTOR DATA", data)
+    print("PIPELINE SELECTOR ASSET SELECTION", asset_selection)
     return PipelineSelector(
         location_name=data["repositoryLocationName"],
         repository_name=data["repositoryName"],
         pipeline_name=check.not_none(data.get("pipelineName") or data.get("jobName")),
         solid_selection=data.get("solidSelection"),
-        asset_selection=[
-            check.not_none(AssetKey.from_graphql_input(asset_key)) for asset_key in asset_selection
+        asset_selection=[  # type: ignore
+            AssetKey.from_graphql_input(asset_key) for asset_key in asset_selection
         ]
         if asset_selection
         else None,

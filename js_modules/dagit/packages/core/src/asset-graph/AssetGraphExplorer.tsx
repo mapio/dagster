@@ -49,6 +49,7 @@ import {
   LiveData,
   GraphNode,
   tokenForAssetKey,
+  LiveDataForNode,
 } from './Utils';
 import {AssetGraphLayout} from './layout';
 import {AssetGraphQuery_assetNodes} from './types/AssetGraphQuery';
@@ -72,6 +73,11 @@ interface Props {
 
 export const MINIMAL_SCALE = 0.5;
 export const EXPERIMENTAL_SCALE = 0.1;
+
+const includeInAll = (
+  {isVersioned}: AssetNode,
+  liveData?: LiveDataForNode,
+) => (isVersioned && liveData ? liveData.currentLogicalVersion !== liveData.projectedLogicalVersion : true);
 
 export const AssetGraphExplorer: React.FC<Props> = (props) => {
   const {
@@ -156,7 +162,6 @@ export const AssetGraphExplorerWithData: React.FC<
   const selectedGraphNodes = Object.values(assetGraphData.nodes).filter((node) =>
     selectedAssetValues.includes(tokenForAssetKey(node.definition.assetKey)),
   );
-  console.log('ASSET SELECTION', selectedAssetValues);
   const lastSelectedNode = selectedGraphNodes[selectedGraphNodes.length - 1];
 
   const {layout, loading, async} = useAssetLayout(assetGraphData);
@@ -232,6 +237,11 @@ export const AssetGraphExplorerWithData: React.FC<
     ],
   );
 
+  // const layoutsEqual(layout1: AssetGraphLayout, layout2: AssetGraphLayout) {
+  //   return (layout1.width === layout2.width) &&
+  //     (layout1.height === layout2.height) &&
+  // }
+
   const [lastRenderedLayout, setLastRenderedLayout] = React.useState<AssetGraphLayout | null>(null);
   const renderingNewLayout = lastRenderedLayout !== layout;
 
@@ -243,7 +253,7 @@ export const AssetGraphExplorerWithData: React.FC<
     // focus on the selected node. (If selection was specified in the URL).
     // Don't animate this change.
     if (lastSelectedNode) {
-      viewportEl.current.zoomToSVGBox(layout.nodes[lastSelectedNode.id].bounds, false);
+      // viewportEl.current.zoomToSVGBox(layout.nodes[lastSelectedNode.id].bounds, false);
       viewportEl.current.focus();
     } else {
       viewportEl.current.autocenter(false);
@@ -274,6 +284,7 @@ export const AssetGraphExplorerWithData: React.FC<
 
   const allowExperimentalZoom =
     flags.flagAssetGraphExperimentalZoom && layout && Object.keys(layout.groups).length;
+  const selectionContext = selectedGraphNodes.length ? 'selected' : 'all';
 
   return (
     <SplitPanelContainer
@@ -361,7 +372,7 @@ export const AssetGraphExplorerWithData: React.FC<
                         }}
                         style={{overflow: 'visible'}}
                       >
-                        {!graphNode || !graphNode.definition.opNames.length ? (
+                        {false && (!graphNode || !graphNode.definition.opNames.length) ? (
                           <SourceAssetNode
                             assetKey={{path}}
                             selected={selectedAssetValues.includes(path)}
@@ -421,18 +432,26 @@ export const AssetGraphExplorerWithData: React.FC<
                 dataDescription="materializations"
               />
               <LaunchAssetObservationButton
-                context={selectedGraphNodes.length ? 'selected' : 'all'}
+                context={selectionContext}
                 assetKeys={(selectedGraphNodes.length
-                  ? selectedGraphNodes
-                  : Object.values(assetGraphData.nodes).filter((a) => a.definition.isSource)
+                  ? selectedGraphNodes.filter(
+                      (a) => a.definition.isSource && a.definition.isVersioned,
+                    )
+                  : Object.values(assetGraphData.nodes).filter(
+                      (a) => a.definition.isSource && a.definition.isVersioned,
+                    )
                 ).map((n) => n.assetKey)}
                 preferredJobName={explorerPath.pipelineName}
               />
               <LaunchAssetExecutionButton
-                context={selectedGraphNodes.length ? 'selected' : 'all'}
+                context={selectionContext}
                 assetKeys={(selectedGraphNodes.length
-                  ? selectedGraphNodes
-                  : Object.values(assetGraphData.nodes).filter((a) => !a.definition.isSource)
+                  ? selectedGraphNodes.filter((a) => !a.definition.isSource)
+                  : Object.values(assetGraphData.nodes).filter(
+                      (a) =>
+                        !a.definition.isSource &&
+                        includeInAll(a.definition, liveDataByNode[a.id]),
+                    )
                 ).map((n) => n.assetKey)}
                 preferredJobName={explorerPath.pipelineName}
               />

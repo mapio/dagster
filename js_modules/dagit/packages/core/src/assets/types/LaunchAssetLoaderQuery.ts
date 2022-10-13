@@ -561,7 +561,7 @@ export interface LaunchAssetLoaderQuery_assetNodes {
   jobNames: string[];
   graphName: string | null;
   partitionDefinition: string | null;
-  versioned: boolean | null;
+  isVersioned: boolean;
   isSource: boolean;
   assetKey: LaunchAssetLoaderQuery_assetNodes_assetKey;
   dependencyKeys: LaunchAssetLoaderQuery_assetNodes_dependencyKeys[];

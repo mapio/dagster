@@ -411,6 +411,7 @@ type AssetNode {
   groupName: String
   id: ID!
   isSource: Boolean!
+  isVersioned: Boolean!
   jobNames: [String!]!
   jobs: [Pipeline!]!
   latestMaterializationByPartition(partitions: [String]): [MaterializationEvent]!
@@ -419,13 +420,13 @@ type AssetNode {
   op: SolidDefinition
   opName: String
   opNames: [String!]!
+  opVersion: String
   partitionKeys: [String!]!
   partitionDefinition: String
   projectedLogicalVersion: String
   repository: Repository!
   requiredResources: [ResourceRequirement!]!
   type: DagsterType
-  versioned: Boolean
 }
 
 type AssetKey {
@@ -3379,6 +3380,12 @@ type AssetMetadataEntry implements MetadataEntry {
   label: String!
   description: String
   assetKey: AssetKey!
+}
+
+type LogicalVersionMetadataEntry implements MetadataEntry {
+  label: String!
+  description: String
+  value: String!
 }
 
 scalar Cursor

@@ -5,6 +5,7 @@ import {AssetComputeStatus} from '../types/globalTypes';
 import {
   AssetGraphLiveQuery_assetsLatestInfo_latestRun,
   AssetGraphLiveQuery_assetNodes_assetMaterializations,
+  AssetGraphLiveQuery_assetNodes_assetObservations,
   AssetGraphLiveQuery,
   AssetGraphLiveQuery_assetsLatestInfo,
   AssetGraphLiveQuery_assetNodes,
@@ -117,6 +118,9 @@ export interface LiveDataForNode {
   inProgressRunIds: string[]; // run in progress and step in progress
   runWhichFailedToMaterialize: AssetGraphLiveQuery_assetsLatestInfo_latestRun | null;
   lastMaterialization: AssetGraphLiveQuery_assetNodes_assetMaterializations | null;
+  lastObservation: AssetGraphLiveQuery_assetNodes_assetObservations | null;
+  currentLogicalVersion: string | null;
+  projectedLogicalVersion: string | null;
   computeStatus: AssetComputeStatus;
 }
 export interface LiveData {
@@ -153,6 +157,9 @@ export const buildLiveDataForNode = (
   assetLatestInfo?: AssetLatestInfo,
 ): LiveDataForNode => {
   const lastMaterialization = assetNode.assetMaterializations[0] || null;
+  const lastObservation = assetNode.assetObservations[0] || null;
+  const currentLogicalVersion = assetNode.currentLogicalVersion;
+  const projectedLogicalVersion = assetNode.projectedLogicalVersion;
   const latestRunForAsset = assetLatestInfo?.latestRun ? assetLatestInfo.latestRun : null;
 
   const runWhichFailedToMaterialize =
@@ -163,6 +170,9 @@ export const buildLiveDataForNode = (
 
   return {
     lastMaterialization,
+    lastObservation,
+    currentLogicalVersion,
+    projectedLogicalVersion,
     stepKey: assetNode.opNames[0],
     inProgressRunIds: assetLatestInfo?.inProgressRunIds || [],
     unstartedRunIds: assetLatestInfo?.unstartedRunIds || [],

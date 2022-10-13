@@ -48,6 +48,12 @@ export interface SingleAssetQuery_assetOrError_Asset_definition_assetMaterializa
   runId: string;
 }
 
+export interface SingleAssetQuery_assetOrError_Asset_definition_assetObservations {
+  __typename: "ObservationEvent";
+  timestamp: string;
+  runId: string;
+}
+
 export interface SingleAssetQuery_assetOrError_Asset_definition {
   __typename: "AssetNode";
   id: string;
@@ -58,6 +64,9 @@ export interface SingleAssetQuery_assetOrError_Asset_definition {
   opNames: string[];
   assetKey: SingleAssetQuery_assetOrError_Asset_definition_assetKey;
   assetMaterializations: SingleAssetQuery_assetOrError_Asset_definition_assetMaterializations[];
+  assetObservations: SingleAssetQuery_assetOrError_Asset_definition_assetObservations[];
+  currentLogicalVersion: string | null;
+  projectedLogicalVersion: string | null;
 }
 
 export interface SingleAssetQuery_assetOrError_Asset {

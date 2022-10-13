@@ -23,6 +23,12 @@ export interface AssetNodeLiveFragment_assetMaterializations {
   runId: string;
 }
 
+export interface AssetNodeLiveFragment_assetObservations {
+  __typename: "ObservationEvent";
+  timestamp: string;
+  runId: string;
+}
+
 export interface AssetNodeLiveFragment {
   __typename: "AssetNode";
   id: string;
@@ -30,6 +36,7 @@ export interface AssetNodeLiveFragment {
   repository: AssetNodeLiveFragment_repository;
   assetKey: AssetNodeLiveFragment_assetKey;
   assetMaterializations: AssetNodeLiveFragment_assetMaterializations[];
+  assetObservations: AssetNodeLiveFragment_assetObservations[];
   currentLogicalVersion: string | null;
   projectedLogicalVersion: string | null;
 }

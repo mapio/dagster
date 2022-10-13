@@ -27,6 +27,7 @@ import dagster._check as check
 from dagster._annotations import experimental, public
 from dagster._core.definitions.asset_selection import AssetSelection
 from dagster._core.definitions.assets import AssetsDefinition
+from dagster._core.definitions.instigation_logger import InstigationLogger
 from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.definitions.partition_key_range import PartitionKeyRange
 from dagster._core.definitions.time_window_partitions import TimeWindowPartitionsDefinition
@@ -102,6 +103,7 @@ class SensorEvaluationContext:
         cursor: Optional[str],
         repository_name: Optional[str],
         instance: Optional[DagsterInstance] = None,
+        sensor_name: Optional[str] = None,
     ):
         self._exit_stack = ExitStack()
         self._instance_ref = check.opt_inst_param(instance_ref, "instance_ref", InstanceRef)
@@ -112,8 +114,17 @@ class SensorEvaluationContext:
         self._cursor = check.opt_str_param(cursor, "cursor")
         self._repository_name = check.opt_str_param(repository_name, "repository_name")
         self._instance = check.opt_inst_param(instance, "instance", DagsterInstance)
+        self._log_key = None
+        self._logger: Optional[InstigationLogger] = None
+        self._sensor_name = sensor_name
 
     def __enter__(self):
+        if self._repository_name and self._sensor_name:
+            self._log_key = [
+                self._repository_name,
+                self._sensor_name,
+                pendulum.now("UTC").strftime("%Y%m%d_%H%M%S"),
+            ]
         return self
 
     def __exit__(self, _exception_type, _exception_value, _traceback):
@@ -167,6 +178,27 @@ class SensorEvaluationContext:
     @property
     def repository_name(self) -> Optional[str]:
         return self._repository_name
+
+    @property
+    def log(self) -> InstigationLogger:
+        if self._logger:
+            return self._logger
+
+        if not self._instance_ref:
+            self._logger = self._exit_stack.enter_context(InstigationLogger(self._log_key))
+            return cast(InstigationLogger, self._logger)
+
+        self._logger = self._exit_stack.enter_context(
+            InstigationLogger(self._log_key, self.instance)
+        )
+        return cast(InstigationLogger, self._logger)
+
+    def has_captured_logs(self):
+        return self._logger and self._logger.has_captured_logs()
+
+    @property
+    def log_key(self) -> Optional[List[str]]:
+        return self._log_key
 
 
 def _get_partition_key_from_event_log_record(event_log_record: "EventLogRecord") -> Optional[str]:
@@ -370,6 +402,7 @@ class MultiAssetSensorEvaluationContext(SensorEvaluationContext):
         asset_selection: Optional[AssetSelection],
         asset_keys: Optional[Sequence[AssetKey]],
         instance: Optional[DagsterInstance] = None,
+        sensor_name: Optional[str] = None,
     ):
         from dagster._core.storage.event_log.base import EventLogRecord
 
@@ -417,6 +450,7 @@ class MultiAssetSensorEvaluationContext(SensorEvaluationContext):
             cursor=cursor,
             repository_name=repository_name,
             instance=instance,
+            sensor_name=sensor_name,
         )
 
     def _cache_initial_unconsumed_events(self) -> None:
@@ -1266,72 +1300,56 @@ class SensorDefinition:
         """
 
         context = check.inst_param(context, "context", SensorEvaluationContext)
-        compute_log_manager = context.instance.compute_log_manager
 
-        with ExitStack() as stack:
-            from dagster._core.storage.captured_log_manager import CapturedLogManager
+        result = list(self._evaluation_fn(context))
 
-            if isinstance(compute_log_manager, CapturedLogManager):
-                log_key = [
-                    context.repository_name,
-                    self.name,
-                    pendulum.now("UTC").strftime("%Y%m%d_%H%M%S"),
-                ]
-                stack.enter_context(compute_log_manager.capture_logs(log_key))
-            else:
-                log_key = None
+        skip_message: Optional[str] = None
 
-            result = list(self._evaluation_fn(context))
-
-            skip_message: Optional[str] = None
-
-            run_requests: List[RunRequest]
-            pipeline_run_reactions: List[PipelineRunReaction]
-            if not result or result == [None]:
-                run_requests = []
-                pipeline_run_reactions = []
-                skip_message = "Sensor function returned an empty result"
-            elif len(result) == 1:
-                item = result[0]
-                check.inst(item, (SkipReason, RunRequest, PipelineRunReaction))
-                run_requests = [item] if isinstance(item, RunRequest) else []
-                pipeline_run_reactions = (
-                    [cast(PipelineRunReaction, item)]
-                    if isinstance(item, PipelineRunReaction)
-                    else []
-                )
-                skip_message = item.skip_message if isinstance(item, SkipReason) else None
-            else:
-                check.is_list(result, (SkipReason, RunRequest, PipelineRunReaction))
-                has_skip = any(map(lambda x: isinstance(x, SkipReason), result))
-                run_requests = [item for item in result if isinstance(item, RunRequest)]
-                pipeline_run_reactions = [
-                    item for item in result if isinstance(item, PipelineRunReaction)
-                ]
-
-                if has_skip:
-                    if len(run_requests) > 0:
-                        check.failed(
-                            "Expected a single SkipReason or one or more RunRequests: received both "
-                            "RunRequest and SkipReason"
-                        )
-                    elif len(pipeline_run_reactions) > 0:
-                        check.failed(
-                            "Expected a single SkipReason or one or more PipelineRunReaction: "
-                            "received both PipelineRunReaction and SkipReason"
-                        )
-                    else:
-                        check.failed("Expected a single SkipReason: received multiple SkipReasons")
-
-            self.check_valid_run_requests(run_requests)
-
-            return SensorExecutionData(
-                run_requests,
-                skip_message,
-                context.cursor,
-                pipeline_run_reactions,
-                captured_log_key=log_key,
+        run_requests: List[RunRequest]
+        pipeline_run_reactions: List[PipelineRunReaction]
+        if not result or result == [None]:
+            run_requests = []
+            pipeline_run_reactions = []
+            skip_message = "Sensor function returned an empty result"
+        elif len(result) == 1:
+            item = result[0]
+            check.inst(item, (SkipReason, RunRequest, PipelineRunReaction))
+            run_requests = [item] if isinstance(item, RunRequest) else []
+            pipeline_run_reactions = (
+                [cast(PipelineRunReaction, item)] if isinstance(item, PipelineRunReaction) else []
             )
+            skip_message = item.skip_message if isinstance(item, SkipReason) else None
+        else:
+            check.is_list(result, (SkipReason, RunRequest, PipelineRunReaction))
+            has_skip = any(map(lambda x: isinstance(x, SkipReason), result))
+            run_requests = [item for item in result if isinstance(item, RunRequest)]
+            pipeline_run_reactions = [
+                item for item in result if isinstance(item, PipelineRunReaction)
+            ]
+
+            if has_skip:
+                if len(run_requests) > 0:
+                    check.failed(
+                        "Expected a single SkipReason or one or more RunRequests: received both "
+                        "RunRequest and SkipReason"
+                    )
+                elif len(pipeline_run_reactions) > 0:
+                    check.failed(
+                        "Expected a single SkipReason or one or more PipelineRunReaction: "
+                        "received both PipelineRunReaction and SkipReason"
+                    )
+                else:
+                    check.failed("Expected a single SkipReason: received multiple SkipReasons")
+
+        self.check_valid_run_requests(run_requests)
+
+        return SensorExecutionData(
+            run_requests,
+            skip_message,
+            context.cursor,
+            pipeline_run_reactions,
+            captured_log_key=context.log_key if context.has_captured_logs() else None,
+        )
 
     def has_loadable_targets(self) -> bool:
         for target in self._targets:
@@ -1462,6 +1480,7 @@ def build_sensor_context(
     instance: Optional[DagsterInstance] = None,
     cursor: Optional[str] = None,
     repository_name: Optional[str] = None,
+    sensor_name: Optional[str] = None,
 ) -> SensorEvaluationContext:
     """Builds sensor execution context using the provided parameters.
 
@@ -1493,6 +1512,7 @@ def build_sensor_context(
         cursor=cursor,
         repository_name=repository_name,
         instance=instance,
+        sensor_name=sensor_name,
     )
 
 

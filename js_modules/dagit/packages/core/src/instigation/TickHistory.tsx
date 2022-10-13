@@ -19,7 +19,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import * as React from 'react';
 import styled from 'styled-components/macro';
 
-import {CapturedLogDialog} from '../CapturedLogDialog';
+import {TickLogDialog} from '../TickLogDialog';
 import {SharedToaster} from '../app/DomUtils';
 import {PythonErrorInfo, PYTHON_ERROR_FRAGMENT} from '../app/PythonErrorInfo';
 import {ONE_MONTH, useQueryRefreshAtInterval} from '../app/QueryRefresh';
@@ -169,8 +169,9 @@ export const TicksTable = ({
   return (
     <>
       {logTick ? (
-        <CapturedLogDialog
-          logKey={logTick.logKey || undefined}
+        <TickLogDialog
+          tick={logTick}
+          instigationSelector={instigationSelector}
           onClose={() => setLogTick(undefined)}
         />
       ) : null}
@@ -246,11 +247,7 @@ export const TicksTable = ({
                   )}
                 </td>
                 <td>
-                  {tick.logKey ? (
-                    <a onClick={() => setLogTick(tick)}>stdout / stderr</a>
-                  ) : (
-                    <>&mdash;</>
-                  )}
+                  {tick.logKey ? <a onClick={() => setLogTick(tick)}>View logs</a> : <>&mdash;</>}
                 </td>
               </tr>
             ))}

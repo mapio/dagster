@@ -1,6 +1,5 @@
 # pylint: disable=unused-argument
 
-import logging
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import IO, Generator, List, NamedTuple, Optional
@@ -175,6 +174,15 @@ class CapturedLogManager(ABC):
 
         Returns:
             Boolean
+        """
+
+    @abstractmethod
+    def on_progress(self, log_key: List[str]):
+        """Utility method that can be called periodically while logs are being captured, in order
+        to support different batched streaming implementations.
+
+        Args:
+            log_key (List[String]): The log key identifying the captured logs
         """
 
     @abstractmethod

@@ -52,7 +52,7 @@ class CapturedLogHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord):
         self._has_logged = True
-        self._write_stream.write(_seven.json.dumps(record.__dict__))
+        self._write_stream.write(_seven.json.dumps(record.__dict__) + "\n")
 
 
 class InstigationLogger(logging.Logger):
@@ -76,7 +76,7 @@ class InstigationLogger(logging.Logger):
             and isinstance(self._instance.compute_log_manager, CapturedLogManager)
         ):
             write_stream = self._exit_stack.enter_context(
-                self._instance.compute_log_manager.write_log_stream(self._log_key)
+                self._instance.compute_log_manager.open_log_stream(self._log_key)
             )
             if write_stream:
                 self._capture_handler = CapturedLogHandler(write_stream)

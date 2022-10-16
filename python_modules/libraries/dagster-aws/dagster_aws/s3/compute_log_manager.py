@@ -5,7 +5,7 @@ import threading
 import time
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import List, Optional, Union
+from typing import IO, Generator, List, Optional, Union
 
 import boto3
 from botocore.errorfactory import ClientError
@@ -132,11 +132,43 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         with self._poll_for_local_upload(log_key, interval=10):
             with self._local_manager.capture_logs(log_key):
                 yield
+        self._on_capture_complete(log_key)
+
+    @contextmanager
+    def open_log_stream(
+        self, log_key: List[str], io_type: ComputeIOType
+    ) -> Generator[Optional[IO], None, None]:
+        with self._local_manager.open_log_stream(log_key, io_type) as f:
+            yield f
+        self._on_capture_complete(log_key)
+
+    def _on_capture_complete(self, log_key: List[str]):
         self._upload_from_local(log_key, ComputeIOType.STDOUT)
         self._upload_from_local(log_key, ComputeIOType.STDERR)
 
     def is_capture_complete(self, log_key: List[str]):
         return self._local_manager.is_capture_complete(log_key)
+
+    def _log_data_for_type(self, log_key, io_type, offset, max_bytes) -> bool:
+        if self._has_local_file(log_key, io_type):
+            local_path = self._local_manager.get_captured_local_path(
+                log_key, IO_TYPE_EXTENSION[io_type]
+            )
+            return self._local_manager.read_path(local_path, offset=offset, max_bytes=max_bytes)
+        if self._has_remote_file(log_key, io_type):
+            self._download_to_local(log_key, io_type)
+            local_path = self._local_manager.get_captured_local_path(
+                log_key, IO_TYPE_EXTENSION[io_type]
+            )
+            return self._local_manager.read_path(local_path, offset=offset, max_bytes=max_bytes)
+        if self._has_remote_file(log_key, io_type, partial=True):
+            self._download_to_local(log_key, io_type, partial=True)
+            local_path = self._local_manager.get_captured_local_path(
+                log_key, IO_TYPE_EXTENSION[io_type], partial=True
+            )
+            return self._local_manager.read_path(local_path, offset=offset, max_bytes=max_bytes)
+
+        return None, offset
 
     def get_log_data(
         self,
@@ -144,11 +176,19 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         cursor: str = None,
         max_bytes: int = None,
     ) -> CapturedLogData:
-        if self._should_download(log_key, ComputeIOType.STDOUT):
-            self._download_to_local(log_key, ComputeIOType.STDOUT)
-        if self._should_download(log_key, ComputeIOType.STDERR):
-            self._download_to_local(log_key, ComputeIOType.STDERR)
-        return self._local_manager.get_log_data(log_key, cursor, max_bytes)
+        stdout_offset, stderr_offset = self._local_manager.parse_cursor(cursor)
+        stdout, new_stdout_offset = self._log_data_for_type(
+            log_key, ComputeIOType.STDOUT, stdout_offset, max_bytes
+        )
+        stderr, new_stderr_offset = self._log_data_for_type(
+            log_key, ComputeIOType.STDOUT, stderr_offset, max_bytes
+        )
+        return CapturedLogData(
+            log_key=log_key,
+            stdout=stdout,
+            stderr=stderr,
+            cursor=self._local_manager.build_cursor(new_stdout_offset, new_stderr_offset),
+        )
 
     def get_contextual_log_metadata(self, log_key: List[str]) -> CapturedLogMetadata:
         stdout_s3_key = self._s3_key(log_key, ComputeIOType.STDOUT)
@@ -177,6 +217,17 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
 
         self._upload_from_local(log_key, ComputeIOType.STDOUT, partial=True)
         self._upload_from_local(log_key, ComputeIOType.STDERR, partial=True)
+
+    def delete_logs(self, log_key: List[str]):
+        self._local_manager.delete_logs(log_key)
+        s3_keys_to_remove = [
+            self._s3_key(log_key, ComputeIOType.STDOUT),
+            self._s3_key(log_key, ComputeIOType.STDERR),
+            self._s3_key(log_key, ComputeIOType.STDOUT, partial=True),
+            self._s3_key(log_key, ComputeIOType.STDERR, partial=True),
+        ]
+        s3_objects = [{"Key": key} for key in s3_keys_to_remove]
+        self._s3_session.delete_objects(Bucket=self._s3_bucket, Delete={"Objects": s3_objects})
 
     def subscribe(
         self, log_key: List[str], cursor: Optional[str] = None

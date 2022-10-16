@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import List, Optional
+from typing import IO, Generator, List, Optional
 
 import dagster._check as check
 from dagster._core.storage.captured_log_manager import (
@@ -10,7 +10,12 @@ from dagster._core.storage.captured_log_manager import (
 )
 from dagster._serdes import ConfigurableClass, ConfigurableClassData
 
-from .compute_log_manager import MAX_BYTES_FILE_READ, ComputeLogFileData, ComputeLogManager
+from .compute_log_manager import (
+    MAX_BYTES_FILE_READ,
+    ComputeIOType,
+    ComputeLogFileData,
+    ComputeLogManager,
+)
 
 
 class NoOpComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableClass):
@@ -65,6 +70,12 @@ class NoOpComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableC
     def is_capture_complete(self, log_key: List[str]):
         return True
 
+    @contextmanager
+    def open_log_stream(
+        self, log_key: List[str], io_type: ComputeIOType
+    ) -> Generator[Optional[IO], None, None]:
+        yield None
+
     def get_log_data(
         self,
         log_key: List[str],
@@ -77,6 +88,9 @@ class NoOpComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableC
         return CapturedLogMetadata()
 
     def on_progress(self, log_key: List[str]):
+        pass
+
+    def delete_logs(self, log_key: List[str]):
         pass
 
     def subscribe(

@@ -35,7 +35,6 @@ from dagster._serdes import ConfigurableClass, ConfigurableClassData, serialize_
 from dagster._serdes.ipc import interrupt_ipc_subprocess, open_ipc_subprocess
 from dagster._seven import wait_for_process
 from dagster._utils import ensure_dir, ensure_file
-from dagster._utils.yaml_utils import dump_run_config_yaml
 
 from . import poll_upload
 
@@ -146,10 +145,10 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         self._upload_from_local(log_key, ComputeIOType.STDOUT)
         self._upload_from_local(log_key, ComputeIOType.STDERR)
 
-    def is_capture_complete(self, log_key: List[str]):
+    def is_capture_complete(self, log_key: List[str]) -> bool:
         return self._local_manager.is_capture_complete(log_key)
 
-    def _log_data_for_type(self, log_key, io_type, offset, max_bytes) -> bool:
+    def _log_data_for_type(self, log_key, io_type, offset, max_bytes):
         if self._has_local_file(log_key, io_type):
             local_path = self._local_manager.get_captured_local_path(
                 log_key, IO_TYPE_EXTENSION[io_type]
@@ -181,7 +180,7 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
             log_key, ComputeIOType.STDOUT, stdout_offset, max_bytes
         )
         stderr, new_stderr_offset = self._log_data_for_type(
-            log_key, ComputeIOType.STDOUT, stderr_offset, max_bytes
+            log_key, ComputeIOType.STDERR, stderr_offset, max_bytes
         )
         return CapturedLogData(
             log_key=log_key,
@@ -308,8 +307,6 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
                     ]
                 )
                 yield
-            except:
-                print("blahhh exc")
             finally:
                 if upload_process:
                     interrupt_ipc_subprocess(upload_process)

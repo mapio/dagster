@@ -1,3 +1,5 @@
+# pylint: disable=protected-access
+
 import os
 import sys
 import tempfile

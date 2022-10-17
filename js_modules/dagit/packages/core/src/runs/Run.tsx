@@ -21,7 +21,7 @@ import {LogsScrollingTable} from './LogsScrollingTable';
 import {LogsToolbar, LogType} from './LogsToolbar';
 import {RunActionButtons} from './RunActionButtons';
 import {RunContext} from './RunContext';
-import {IRunMetadataDict, RunMetadataProvider} from './RunMetadataProvider';
+import {ILogCaptureInfo, IRunMetadataDict, RunMetadataProvider} from './RunMetadataProvider';
 import {
   RunDagsterRunEventFragment,
   RunDagsterRunEventFragment_ExecutionStepFailureEvent,
@@ -134,6 +134,11 @@ const logTypeFromQuery = (queryLogType: string) => {
   }
 };
 
+const matchingComputeLogKeyFromStepKey = (logCaptureSteps: ILogCaptureInfo[], stepKey: string) => {
+  const matching = logCaptureSteps.find((info) => info.stepKeys.includes(stepKey));
+  return matching && matching?.fileKey;
+};
+
 /**
  * Note: There are two places we keep a "step query string" in the Run view:
  * selectionQuery and logsFilter.logsQuery.
@@ -201,9 +206,17 @@ const RunWithData: React.FC<RunWithDataProps> = ({
       });
       setComputeLogKey(selectedLogKey || logFileKeys[0]);
     } else if (!stepKeys.includes(computeLogKey)) {
-      setComputeLogKey(selectionStepKeys.length === 1 ? selectionStepKeys[0] : stepKeys[0]);
+      const matching = matchingComputeLogKeyFromStepKey(
+        Object.values(metadata.logCaptureSteps || []),
+        selectionStepKeys.length === 1 ? selectionStepKeys[0] : stepKeys[0],
+      );
+      matching && setComputeLogKey(matching);
     } else if (selectionStepKeys.length === 1 && computeLogKey !== selectionStepKeys[0]) {
-      setComputeLogKey(selectionStepKeys[0]);
+      const matching = matchingComputeLogKeyFromStepKey(
+        Object.values(metadata.logCaptureSteps || []),
+        selectionStepKeys[0],
+      );
+      matching && setComputeLogKey(matching);
     }
   }, [stepKeys, computeLogKey, selectionStepKeys, metadata.logCaptureSteps, setComputeLogKey]);
 
@@ -245,7 +258,11 @@ const RunWithData: React.FC<RunWithDataProps> = ({
         newSelected = [filterForExactStep];
 
         // When only one step is selected, set the compute log key as well.
-        setComputeLogKey(stepKey);
+        const matchingLogKey = metadata.logCaptureSteps
+          ? Object.values(metadata.logCaptureSteps).find((info) => info.stepKeys.includes(stepKey))
+              ?.fileKey
+          : undefined;
+        matchingLogKey && setComputeLogKey(matchingLogKey);
       }
     }
 
@@ -293,6 +310,11 @@ const RunWithData: React.FC<RunWithDataProps> = ({
     return <NonIdealState icon="error" title="Unable to build execution plan" />;
   };
 
+  const logCaptureInfo: ILogCaptureInfo | undefined =
+    metadata.logCaptureSteps && computeLogKey in metadata.logCaptureSteps
+      ? metadata.logCaptureSteps[computeLogKey]
+      : undefined;
+
   return (
     <>
       <SplitPanelContainer
@@ -320,11 +342,7 @@ const RunWithData: React.FC<RunWithDataProps> = ({
               supportsCapturedLogs ? (
                 <CapturedOrExternalLogPanel
                   logKey={[runId, 'compute_logs', computeLogKey]}
-                  externalUrl={
-                    metadata.logCaptureSteps
-                      ? metadata.logCaptureSteps[computeLogKey].externalUrl
-                      : undefined
-                  }
+                  externalUrl={logCaptureInfo?.externalUrl}
                   visibleIOType={LogType[logType]}
                   onSetDownloadUrl={setComputeLogUrl}
                 />

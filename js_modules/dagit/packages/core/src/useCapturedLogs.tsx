@@ -35,7 +35,8 @@ interface State {
 
 type Action =
   | {type: 'update'; logData: CapturedLogsSubscription_capturedLogs | null}
-  | {type: 'metadata'; metadata: any};
+  | {type: 'metadata'; metadata: any}
+  | {type: 'reset'};
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
@@ -52,6 +53,10 @@ const reducer = (state: State, action: Action): State => {
         ...state,
         ...action.metadata,
       };
+    case 'reset':
+      return {
+        ...initialState,
+      };
     default:
       return state;
   }
@@ -66,6 +71,11 @@ const initialState: State = {
 
 export const useCapturedLogs = (logKey: string[]) => {
   const [state, dispatch] = React.useReducer(reducer, initialState);
+
+  const logKeyString = JSON.stringify(logKey);
+  React.useEffect(() => {
+    dispatch({type: 'reset'});
+  }, [logKeyString]);
 
   useSubscription<CapturedLogsSubscription, CapturedLogsSubscriptionVariables>(
     CAPTURED_LOGS_SUBSCRIPTION,

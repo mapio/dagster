@@ -1,9 +1,10 @@
 import os
-from typing import List
+from contextlib import contextmanager
+from typing import Generator, List
 
 import dagster._check as check
 from dagster import Field, StringSource
-from dagster._core.storage.captured_log_manager import CapturedLogMetadata
+from dagster._core.storage.captured_log_manager import CapturedLogContext
 from dagster._core.storage.noop_compute_log_manager import NoOpComputeLogManager
 from dagster._serdes import ConfigurableClass, ConfigurableClassData
 
@@ -33,18 +34,19 @@ class CloudwatchComputeLogManager(NoOpComputeLogManager, ConfigurableClass):
     def from_config_value(inst_data, config_value):
         return CloudwatchComputeLogManager(inst_data=inst_data, **config_value)
 
-    def get_contextual_log_metadata(
-        self, log_key: List[str]
-    ) -> CapturedLogMetadata:  # pylint: disable=unused-argument
+    @contextmanager
+    def capture_logs(self, log_key: List[str]) -> Generator[CapturedLogContext, None, None]:
         metadata_uri = os.getenv("ECS_CONTAINER_METADATA_URI")
         region = os.getenv("AWS_REGION")
         if not metadata_uri or not region:
-            return CapturedLogMetadata()
+            yield CapturedLogContext(log_key=log_key)
+            return
 
         arn_id = metadata_uri.split("/")[-1].split("-")[0]
         base_url = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}"
         log_group = f"$252Fdocker-compose$252F{self._project_name}"
         log_name = f"{self._project_name}$252Frun$252F{arn_id}"
-        return CapturedLogMetadata(
-            external_url=f"{base_url}#logsV2:log-groups/log-group/{log_group}/log-events/{log_name}"
+        yield CapturedLogContext(
+            log_key=log_key,
+            external_url=f"{base_url}#logsV2:log-groups/log-group/{log_group}/log-events/{log_name}",
         )

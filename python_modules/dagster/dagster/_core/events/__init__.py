@@ -46,7 +46,7 @@ from dagster._core.execution.plan.inputs import StepInputData
 from dagster._core.execution.plan.objects import StepFailureData, StepRetryData, StepSuccessData
 from dagster._core.execution.plan.outputs import StepOutputData
 from dagster._core.log_manager import DagsterLogManager
-from dagster._core.storage.captured_log_manager import CapturedLogMetadata
+from dagster._core.storage.captured_log_manager import CapturedLogContext
 from dagster._core.storage.pipeline_run import PipelineRunStatus
 from dagster._serdes import (
     DefaultNamedTupleSerializer,
@@ -1373,7 +1373,7 @@ class DagsterEvent(
         pipeline_context: IPlanContext,
         step_keys: List[str],
         log_key: List[str],
-        log_metadata: CapturedLogMetadata,
+        log_context: CapturedLogContext,
     ):
         file_key = log_key[-1]
         return DagsterEvent.from_pipeline(
@@ -1381,7 +1381,7 @@ class DagsterEvent(
             pipeline_context,
             message=f"Started capturing logs in process (pid: {os.getpid()}).",
             event_specific_data=ComputeLogsCaptureData(
-                step_keys=step_keys, file_key=file_key, external_url=log_metadata.external_url
+                step_keys=step_keys, file_key=file_key, external_url=log_context.external_url
             ),
         )
 

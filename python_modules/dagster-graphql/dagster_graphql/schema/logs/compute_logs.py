@@ -86,7 +86,6 @@ class GrapheneCapturedLogs(graphene.ObjectType):
 
 
 class GrapheneCapturedLogsMetadata(graphene.ObjectType):
-    externalUrl = graphene.Field(graphene.String)
     stdoutDownloadUrl = graphene.Field(graphene.String)
     stdoutLocation = graphene.Field(graphene.String)
     stderrDownloadUrl = graphene.Field(graphene.String)

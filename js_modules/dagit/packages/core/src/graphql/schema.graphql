@@ -2303,7 +2303,6 @@ enum AssetComputeStatus {
 union EventConnectionOrError = EventConnection | RunNotFoundError | PythonError
 
 type CapturedLogsMetadata {
-  externalUrl: String
   stdoutDownloadUrl: String
   stdoutLocation: String
   stderrDownloadUrl: String

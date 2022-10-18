@@ -44,9 +44,8 @@ def inner_plan_execution_iterator(
         if isinstance(compute_log_manager, CapturedLogManager):
             pid = str(os.getpid())
             log_key = compute_log_manager.build_log_key_for_run(pipeline_context.run_id, pid)
-            plan_stack.enter_context(compute_log_manager.capture_logs(log_key))
-            log_metadata = compute_log_manager.get_contextual_log_metadata(log_key)
-            yield DagsterEvent.capture_logs(pipeline_context, step_keys, log_key, log_metadata)
+            log_context = plan_stack.enter_context(compute_log_manager.capture_logs(log_key))
+            yield DagsterEvent.capture_logs(pipeline_context, step_keys, log_key, log_context)
 
         # It would be good to implement a reference tracking algorithm here to
         # garbage collect results that are no longer needed by any steps

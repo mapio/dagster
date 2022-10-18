@@ -3,6 +3,7 @@ from typing import IO, Generator, List, Optional
 
 import dagster._check as check
 from dagster._core.storage.captured_log_manager import (
+    CapturedLogContext,
     CapturedLogData,
     CapturedLogManager,
     CapturedLogMetadata,
@@ -64,8 +65,8 @@ class NoOpComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableC
         pass
 
     @contextmanager
-    def capture_logs(self, log_key: List[str]):
-        yield
+    def capture_logs(self, log_key: List[str]) -> Generator[CapturedLogContext, None, None]:
+        yield CapturedLogContext(log_key=log_key)
 
     def is_capture_complete(self, log_key: List[str]):
         return True
@@ -84,7 +85,7 @@ class NoOpComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableC
     ) -> CapturedLogData:
         return CapturedLogData(log_key=log_key)
 
-    def get_contextual_log_metadata(self, log_key: List[str]) -> CapturedLogMetadata:
+    def get_log_metadata(self, log_key: List[str]) -> CapturedLogMetadata:
         return CapturedLogMetadata()
 
     def on_progress(self, log_key: List[str]):

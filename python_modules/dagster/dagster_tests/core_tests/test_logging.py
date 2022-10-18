@@ -24,7 +24,7 @@ from dagster._legacy import (
     pipeline,
     solid,
 )
-from dagster._loggers import colored_console_logger, json_console_logger
+from dagster._loggers import colored_console_logger, default_system_loggers, json_console_logger
 from dagster._utils.error import SerializableErrorInfo
 
 REGEX_UUID = r"[a-z-0-9]{8}\-[a-z-0-9]{4}\-[a-z-0-9]{4}\-[a-z-0-9]{4}\-[a-z-0-9]{12}"
@@ -484,3 +484,14 @@ def test_python_log_level_context_logging():
 
     assert len(logs_critical) > 0  # DagsterEvents should still be logged
     assert len(logs_default) == len(logs_critical) + 1
+
+
+def test_system_logging():
+    with instance_for_test(overrides={"python_logs": {"python_log_level": "CRITICAL"}}) as instance:
+        assert default_system_loggers(instance) == [
+            (colored_console_logger, {"name": "dagster", "log_level": "CRITICAL"})
+        ]
+
+    assert default_system_loggers(None) == [
+        (colored_console_logger, {"name": "dagster", "log_level": "DEBUG"})
+    ]

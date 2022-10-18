@@ -15,6 +15,7 @@ from dagster import Field, StringSource
 from dagster import _check as check
 from dagster._core.execution.poll_compute_logs import POLLING_INTERVAL
 from dagster._core.storage.captured_log_manager import (
+    CapturedLogContext,
     CapturedLogData,
     CapturedLogManager,
     CapturedLogMetadata,
@@ -127,10 +128,10 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         return S3ComputeLogManager(inst_data=inst_data, **config_value)
 
     @contextmanager
-    def capture_logs(self, log_key: List[str]):
+    def capture_logs(self, log_key: List[str]) -> Generator[CapturedLogContext, None, None]:
         with self._poll_for_local_upload(log_key, interval=10):
-            with self._local_manager.capture_logs(log_key):
-                yield
+            with self._local_manager.capture_logs(log_key) as context:
+                yield context
         self._on_capture_complete(log_key)
 
     @contextmanager
@@ -189,7 +190,7 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
             cursor=self._local_manager.build_cursor(new_stdout_offset, new_stderr_offset),
         )
 
-    def get_contextual_log_metadata(self, log_key: List[str]) -> CapturedLogMetadata:
+    def get_log_metadata(self, log_key: List[str]) -> CapturedLogMetadata:
         stdout_s3_key = self._s3_key(log_key, ComputeIOType.STDOUT)
         stderr_s3_key = self._s3_key(log_key, ComputeIOType.STDERR)
         stdout_download_url = None

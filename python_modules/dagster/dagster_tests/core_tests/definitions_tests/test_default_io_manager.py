@@ -85,3 +85,26 @@ def test_asset_override_default_io_manager(instance):
 
         result = execute_job(reconstructable(create_asset_job), instance)
         assert result.success
+
+
+def test_bad_override(instance):
+    with environ(
+        {
+            "DAGSTER_DEFAULT_IO_MANAGER_MODULE": "dagster_tests",
+            "DAGSTER_DEFAULT_IO_MANAGER_ATTRIBUTE": "foo_io_manager_def",
+        }
+    ):
+
+        result = execute_job(reconstructable(fs_io_manager_job), instance)
+        assert not result.success
+
+    with environ(
+        {
+            "DAGSTER_DEFAULT_IO_MANAGER_MODULE": "dagster_tests",
+            "DAGSTER_DEFAULT_IO_MANAGER_ATTRIBUTE": "foo_io_manager_def",
+            "DAGSTER_DEFAULT_IO_MANAGER_SILENCE_FAILURES": "True",
+        }
+    ):
+
+        result = execute_job(reconstructable(fs_io_manager_job), instance)
+        assert result.success

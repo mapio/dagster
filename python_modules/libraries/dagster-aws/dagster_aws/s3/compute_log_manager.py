@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import threading
 import time
 from collections import defaultdict
@@ -32,12 +31,8 @@ from dagster._core.storage.local_compute_log_manager import (
     IO_TYPE_EXTENSION,
     LocalComputeLogManager,
 )
-from dagster._serdes import ConfigurableClass, ConfigurableClassData, serialize_dagster_namedtuple
-from dagster._serdes.ipc import interrupt_ipc_subprocess, open_ipc_subprocess
-from dagster._seven import wait_for_process
+from dagster._serdes import ConfigurableClass, ConfigurableClassData
 from dagster._utils import ensure_dir, ensure_file
-
-from . import poll_upload
 
 POLLING_INTERVAL = 5
 
@@ -89,6 +84,7 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         verify_cert_path=None,
         endpoint_url=None,
         skip_empty_files=False,
+        upload_interval=None,
     ):
         _verify = False if not verify else verify_cert_path
         self._s3_session = boto3.resource(
@@ -105,6 +101,7 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         self._subscription_manager = S3ComputeLogSubscriptionManager(self)
         self._inst_data = check.opt_inst_param(inst_data, "inst_data", ConfigurableClassData)
         self._skip_empty_files = check.bool_param(skip_empty_files, "skip_empty_files")
+        self._upload_interval = check.opt_int_param(upload_interval, "upload_interval", default=10)
 
     @property
     def inst_data(self):
@@ -121,6 +118,7 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
             "verify_cert_path": Field(StringSource, is_required=False),
             "endpoint_url": Field(StringSource, is_required=False),
             "skip_empty_files": Field(bool, is_required=False, default_value=False),
+            "upload_interval": Field(int, is_required=False),
         }
 
     @staticmethod
@@ -129,7 +127,7 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
 
     @contextmanager
     def capture_logs(self, log_key: List[str]) -> Generator[CapturedLogContext, None, None]:
-        with self._poll_for_local_upload(log_key, interval=10):
+        with self._poll_for_local_upload(log_key):
             with self._local_manager.capture_logs(log_key) as context:
                 yield context
         self._on_capture_complete(log_key)
@@ -292,28 +290,17 @@ class S3ComputeLogManager(CapturedLogManager, ComputeLogManager, ConfigurableCla
         return "/".join(paths)  # s3 path delimiter
 
     @contextmanager
-    def _poll_for_local_upload(self, log_key, interval=10):
-        if self._inst_data:
-            poll_file = os.path.abspath(poll_upload.__file__)
-            upload_process = None
-            try:
-                upload_process = open_ipc_subprocess(
-                    [
-                        sys.executable,
-                        poll_file,
-                        str(os.getpid()),
-                        serialize_dagster_namedtuple(self.inst_data),
-                        json.dumps(log_key),
-                        str(interval),
-                    ]
-                )
-                yield
-            finally:
-                if upload_process:
-                    interrupt_ipc_subprocess(upload_process)
-                    wait_for_process(upload_process)
-        else:
-            yield
+    def _poll_for_local_upload(self, log_key):
+        thread_exit = threading.Event()
+        thread = threading.Thread(
+            target=_upload_partial_logs,
+            args=(self, log_key, thread_exit, self._upload_interval),
+            name="upload-watch",
+        )
+        thread.daemon = True
+        thread.start()
+        yield
+        thread_exit.set()
 
     ###############################################
     #
@@ -490,3 +477,16 @@ class S3ComputeLogSubscriptionManager:
 
     def dispose(self):
         self.__shutdown_event.set()
+
+
+def _upload_partial_logs(
+    compute_log_manager: S3ComputeLogManager,
+    log_key: List[str],
+    thread_exit: threading.Event,
+    interval: int,
+):
+    while True:
+        time.sleep(interval)
+        if thread_exit.is_set() or compute_log_manager.is_capture_complete(log_key):
+            return
+        compute_log_manager.on_progress(log_key)

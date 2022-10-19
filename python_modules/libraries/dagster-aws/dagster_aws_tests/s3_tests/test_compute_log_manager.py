@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+import time
 
 import pytest
 from botocore.exceptions import ClientError
@@ -18,6 +19,7 @@ from dagster._core.storage.local_compute_log_manager import IO_TYPE_EXTENSION
 from dagster._core.storage.root import LocalArtifactStorage
 from dagster._core.storage.runs import SqliteRunStorage
 from dagster._core.test_utils import environ
+from dagster._utils import ensure_dir
 
 HELLO_WORLD = "Hello World"
 SEPARATOR = os.linesep if (os.name == "nt" and sys.version_info < (3,)) else "\n"
@@ -184,3 +186,37 @@ def test_blank_compute_logs(mock_s3_bucket):
 
         assert not stdout.data
         assert not stderr.data
+
+
+def test_streaming(mock_s3_bucket):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        write_manager = S3ComputeLogManager(
+            bucket=mock_s3_bucket.name,
+            local_dir=ensure_dir(os.path.join(temp_dir, "a")),
+            upload_interval=1,
+        )
+        read_manager = S3ComputeLogManager(
+            bucket=mock_s3_bucket.name, local_dir=ensure_dir(os.path.join(temp_dir, "b"))
+        )
+        log_key = ["arbitrary", "log", "key"]
+        with write_manager.capture_logs(log_key) as _context:
+            print("hello stdout")  # pylint: disable=print-call
+            print("hello stderr", file=sys.stderr)  # pylint: disable=print-call
+
+            # read before the write manager has a chance to upload partial results
+            log_data = read_manager.get_log_data(log_key)
+            assert not log_data.stdout
+            assert not log_data.stderr
+
+            # wait past the upload interval and then read again
+            time.sleep(2)
+            log_data = read_manager.get_log_data(log_key)
+            assert log_data.stdout == b"hello stdout\n"
+            assert log_data.stderr == b"hello stderr\n"
+
+            # check the s3 bucket directly that only partial keys have been uploaded
+            keys = {object.key for object in mock_s3_bucket.objects.all()}
+            assert write_manager._s3_key(log_key, ComputeIOType.STDOUT) not in keys
+            assert write_manager._s3_key(log_key, ComputeIOType.STDERR) not in keys
+            assert write_manager._s3_key(log_key, ComputeIOType.STDOUT, partial=True) in keys
+            assert write_manager._s3_key(log_key, ComputeIOType.STDERR, partial=True) in keys

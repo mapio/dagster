@@ -32,13 +32,25 @@ class TypedDictLoader(DagsterTypeLoader):
         return Permissive()
 
     def construct_from_config_value(self, context, config_value):
-        config_value = check.dict_param(config_value, "config_value")
-        runtime_value = dict()
-        for key, val in config_value.items():
-            runtime_value[key] = self._value_dagster_type.loader.construct_from_config_value(
-                context, val
-            )
-        return runtime_value
+        # Due to the fact that input values are presented as dictionaries of
+        # the form {"value": ...}, we need to fully recurse through the
+        # dictionary stack so that we don't accidentally continuously pull the
+        # key "value" out of the dictionary.
+        dict_config_value = check.dict_param(config_value["value"], "config_value")
+        return _typed_dict_runtime_value_helper(
+            context, dict_config_value, self._value_dagster_type
+        )
+
+
+def _typed_dict_runtime_value_helper(context, dict_config_value, value_dagster_type):
+    runtime_value = dict()
+    for key, val in dict_config_value.items():
+        runtime_value[key] = (
+            value_dagster_type.loader.construct_from_config_value(context, val)
+            if not isinstance(value_dagster_type, _TypedPythonDict)
+            else _typed_dict_runtime_value_helper(context, val, value_dagster_type.value_type)
+        )
+    return runtime_value
 
 
 class _TypedPythonDict(DagsterType):

@@ -32,24 +32,24 @@ def define_typed_input_schema_dict(value_config_type):
 
 
 def load_type_input_schema_dict(value):
-    file_type, file_options = list(value.items())[0]
-    if file_type == "value":
-        return file_options
-    elif file_type == "json":
-        with open(file_options["path"], "r", encoding="utf8") as ff:
-            value_dict = seven.json.load(ff)
-            return value_dict["value"]
-    elif file_type == "pickle":
-        with open(file_options["path"], "rb") as ff:
-            return pickle.load(ff)
-    else:
-        check.failed("Unsupported key {key}".format(key=file_type))
+    if len(value) == 1:
+        file_type, file_options = list(value.items())[0]
+        if file_type == "value":
+            return file_options
+        elif file_type == "json":
+            with open(file_options["path"], "r", encoding="utf8") as ff:
+                value_dict = seven.json.load(ff)
+                return value_dict["value"]
+        elif file_type == "pickle":
+            with open(file_options["path"], "rb") as ff:
+                return pickle.load(ff)
+    return value
 
 
 def define_any_input_schema():
     @dagster_type_loader(define_typed_input_schema_dict(ConfigAnyInstance))
     def _any_input_schema(_, config_value):
-        return load_type_input_schema_dict(config_value)
+        return load_type_input_schema_dict(config_value) if config_value is dict else config_value
 
     return _any_input_schema
 

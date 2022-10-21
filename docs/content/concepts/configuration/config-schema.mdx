@@ -78,7 +78,7 @@ job_result = example_job.execute_in_process(
 asset_result = materialize(
     [asset_using_config],
     run_config={
-        "ops": {"asset_using_config": {"config": {"person_name": "Alice"}}}
+        "resources": {"asset_using_config": {"config": {"person_name": "Alice"}}}
     },
 )
 ```
